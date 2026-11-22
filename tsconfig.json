@@ -3,6 +3,11 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["vitest.config.ts", "packages/*/vitest.config.ts", "apps/web/vitest.config.ts"],
+  "include": [
+    "vitest.config.ts",
+    "packages/*/vitest.config.ts",
+    "apps/web/vitest.config.ts",
+    "artifacts/vitest.config.ts"
+  ],
   "files": []
 }

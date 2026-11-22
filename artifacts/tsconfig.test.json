@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "files": ["watchman-v0.tsx", "watchman-v0.test.tsx", "vitest.config.ts"]
+}

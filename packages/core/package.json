@@ -11,7 +11,7 @@
     "./fixtures/synthetic/*.json": "./fixtures/synthetic/*.json"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {

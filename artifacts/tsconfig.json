@@ -1,0 +1,10 @@
+{
+  "$comment": "The artifact alone, as the claude.ai runtime sees it: React and the DOM, no Node types and nothing from this monorepo.",
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "files": ["watchman-v0.tsx"]
+}

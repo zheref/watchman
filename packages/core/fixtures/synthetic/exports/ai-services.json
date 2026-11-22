@@ -1,0 +1,29 @@
+{
+  "$comment": "SYNTHETIC example of the ai-services tracker export: invented entries and example.com links. No real data.",
+  "synthetic": true,
+  "export": "ai-services",
+  "version": 1,
+  "as_of": "2026-01-14T13:00:00Z",
+  "items": [
+    {
+      "id": "svc-1",
+      "title": "Sample service awaiting a plan choice",
+      "project": "Sample Services",
+      "url": "https://example.com/tracker/services/1",
+      "status": "Waiting",
+      "needs_owner": true,
+      "value": 3,
+      "opened_at": "2026-01-10T10:00:00Z",
+      "updated_at": "2026-01-11T10:00:00Z"
+    },
+    {
+      "id": "svc-2",
+      "title": "Demo service running",
+      "project": "Sample Services",
+      "url": "https://example.com/tracker/services/2",
+      "status": "Running",
+      "opened_at": "2026-01-03T10:00:00Z",
+      "updated_at": "2026-01-14T08:00:00Z"
+    }
+  ]
+}

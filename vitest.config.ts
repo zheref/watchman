@@ -5,12 +5,17 @@ import { defineConfig } from 'vitest/config';
 // coverage report (nen shu coverage). Both paths are git-ignored.
 export default defineConfig({
   test: {
-    projects: ['packages/*', 'apps/web'],
+    projects: ['packages/*', 'apps/web', 'artifacts'],
     reporters: ['default', ['junit', { outputFile: '.nen/test-results/vitest.xml' }]],
     coverage: {
       enabled: true,
       provider: 'v8',
-      include: ['packages/*/src/**/*.ts', 'apps/web/src/**/*.{ts,tsx}'],
+      include: [
+        'packages/*/src/**/*.ts',
+        'packages/*/scripts/**/*.ts',
+        'apps/web/src/**/*.{ts,tsx}',
+        'artifacts/*.tsx',
+      ],
       // Barrels only re-export and test helpers are not product code; any other index.ts that
       // carries logic stays measured.
       exclude: [

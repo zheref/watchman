@@ -1,0 +1,10 @@
+{
+  "$comment": "SYNTHETIC example of watchman.config.json, kept in the snapshot directory (never committed with real values). Every key is optional.",
+  "github": {
+    "owner": "sample-owner",
+    "exclude": ["old-experiment", "scratch-*", "sample-owner/private-notes"],
+    "includeArchived": false,
+    "includeForks": false
+  },
+  "utcOffsetMinutes": -300
+}

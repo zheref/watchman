@@ -1,0 +1,52 @@
+{
+  "$comment": "SYNTHETIC example of the handoff-board export: invented cards and example.com links. No real data.",
+  "synthetic": true,
+  "export": "handoff-board",
+  "version": 1,
+  "as_of": "2026-01-14T14:00:00Z",
+  "columns": ["Backlog", "In progress", "Blocked", "Done"],
+  "cards": [
+    {
+      "id": "card-1",
+      "title": "Sample card waiting on a layout call",
+      "project": "Sample Orchard",
+      "url": "https://example.com/board/cards/1",
+      "column": "Blocked",
+      "blocked": true,
+      "value": 4,
+      "opened_at": "2026-01-05T10:00:00Z",
+      "updated_at": "2026-01-08T10:00:00Z",
+      "waiting_since": "2026-01-08T10:00:00Z"
+    },
+    {
+      "id": "card-2",
+      "title": "Approve the sample release notes",
+      "project": "Project Alpha",
+      "url": "https://example.com/board/cards/2",
+      "column": "In progress",
+      "needs_owner": true,
+      "opened_at": "2026-01-12T10:00:00Z",
+      "updated_at": "2026-01-13T10:00:00Z",
+      "due_at": "2026-01-15T12:00:00Z"
+    },
+    {
+      "id": "card-3",
+      "title": "Demo card in the backlog",
+      "project": "Demo Lighthouse",
+      "url": "https://example.com/board/cards/3",
+      "column": "Backlog",
+      "opened_at": "2026-01-02T10:00:00Z",
+      "updated_at": "2026-01-02T10:00:00Z"
+    },
+    {
+      "id": "card-4",
+      "title": "Finished sample card",
+      "project": "Project Alpha",
+      "url": "https://example.com/board/cards/4",
+      "column": "Done",
+      "opened_at": "2026-01-06T10:00:00Z",
+      "updated_at": "2026-01-13T09:00:00Z",
+      "completed_at": "2026-01-13T09:00:00Z"
+    }
+  ]
+}
