@@ -7,7 +7,10 @@ import {
   SnapshotValidationError,
   collectSnapshot,
   createFileSnapshotAdapter,
+  latestSnapshotFileName,
+  parseSnapshotText,
   resolveSnapshotDir,
+  snapshotFileName,
 } from '../index';
 import { NOW } from '../test/builders';
 
@@ -127,5 +130,48 @@ describe('createFileSnapshotAdapter', () => {
     expect(() =>
       createFileSnapshotAdapter({ dir: '  ', readText: () => Promise.resolve('') }),
     ).toThrow(RangeError);
+  });
+});
+
+describe('latestSnapshotFileName', () => {
+  it('picks the newest snapshot-<ISO>.json and ignores every other name', () => {
+    expect(
+      latestSnapshotFileName([
+        'snapshot-2026-11-22T19-07-28Z.json',
+        'watchman.config.json',
+        'snapshot-2026-11-23T08-00-00Z.json',
+        'snapshot.json',
+        'snapshot-2026-11-23T08-00-00Z.json.tmp',
+        'snapshot-latest.json',
+        'snapshot-2026-11-21T23-59-59Z.json',
+      ]),
+    ).toBe('snapshot-2026-11-23T08-00-00Z.json');
+  });
+
+  it('is null when no file matches', () => {
+    expect(latestSnapshotFileName([])).toBeNull();
+    expect(latestSnapshotFileName(['snapshot.json', 'notes.txt'])).toBeNull();
+  });
+
+  it('accepts exactly what the builder writes', () => {
+    const name = snapshotFileName(new Date('2026-11-22T19:07:28.458Z'));
+    expect(latestSnapshotFileName([name])).toBe(name);
+  });
+});
+
+describe('parseSnapshotText', () => {
+  it('returns the whole validated snapshot, sources and offset included', () => {
+    const snapshot = parseSnapshotText(JSON.stringify(fullFixture), 'file:x.json');
+    expect(snapshot.generated_at).toBe('2026-01-14T15:00:00Z');
+    expect(snapshot.synthetic).toBe(true);
+  });
+
+  it('names the source, never the text, on bad JSON or an invalid snapshot', () => {
+    expect(() => parseSnapshotText('{"secret": ', 'file:x.json')).toThrow(
+      new SnapshotSourceError('file:x.json: not valid JSON'),
+    );
+    expect(() => parseSnapshotText('{"schema_version": 1}', 'file:x.json')).toThrow(
+      SnapshotValidationError,
+    );
   });
 });

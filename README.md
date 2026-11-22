@@ -27,9 +27,10 @@ than filled in.
 | later   | an Expo app in `apps/mobile` (scaffold only today) that reuses `packages/core` |
 
 The workspace, tooling and CI are in place, along with the Metro theme, the shared domain model,
-the synthetic fixtures, the v0 artifact (`artifacts/watchman-v0.tsx`) and the `npm run snapshot`
-builder that feeds it. The real home view, its drill-downs and the MCP server land in later pull
-requests.
+the synthetic fixtures, the v0 artifact (`artifacts/watchman-v0.tsx`), the `npm run snapshot`
+builder that feeds it, and the v1 web dashboard (the home view with the four tiles, their
+drill-downs and layout customisation; see [The web dashboard](#the-web-dashboard)). The MCP server
+lands in a later pull request.
 
 ## Layout
 
@@ -38,7 +39,7 @@ This is one npm-workspaces monorepo (npm only: no pnpm, yarn or bun, and one roo
 
 | Path            | Package            | What it is                                                                                                                                       |
 | --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `apps/web`      | `@watchman/web`    | Next.js (App Router, TypeScript) with the Chakra UI v3 Metro theme and its tile, pivot-header and page-shell primitives; `/theme` previews them. |
+| `apps/web`      | `@watchman/web`    | Next.js (App Router, TypeScript): the dashboard (home, four drill-downs) on the Chakra UI v3 Metro theme; `/theme` previews the primitives.      |
 | `apps/mobile`   | `@watchman/mobile` | Expo (TypeScript). Scaffold only; it will show the Attention tile.                                                                               |
 | `packages/core` | `@watchman/core`   | The versioned `Snapshot` model and its validation, the Attention ranking and Flow/Spend/Metrics helpers, source adapters and synthetic fixtures. |
 | `packages/mcp`  | `@watchman/mcp`    | The read-only MCP server. Today: no server and no SDK, only the transport guard that keeps it on stdio or a loopback address, and its tests.     |
@@ -76,8 +77,7 @@ Everything the dashboard shows comes from one versioned document, the **snapshot
   (`value`, `no_data` or `failed`) and the reason. That is how a reader of the file alone can tell
   a complete section from one merged without a source that failed or had no data.
 - The adapters: a **file** adapter that reads a whole snapshot from the directory in
-  `WATCHMAN_SNAPSHOT_DIR` (server-side only, no default; see `apps/web/src/server/snapshot.ts`;
-  unset means "no data"), a read-only **GitHub** adapter, four **manual-export** adapters and a
+  `WATCHMAN_SNAPSHOT_DIR` (server-side only, no default), a read-only **GitHub** adapter, four **manual-export** adapters and a
   Metrics placeholder that always reports "no data". The last six are what `npm run snapshot`
   runs; see [Building a real snapshot](#building-a-real-snapshot).
 - Seven synthetic fixtures live in `packages/core/fixtures/synthetic/` (full, sparse, empty, mixed
@@ -119,9 +119,9 @@ npm run snapshot -- --out /path/outside/the/repo [--no-github]
   real scorecard) is a new adapter added to `snapshotAdapters` (replacing the `scorecard`
   placeholder, since adapter ids are unique), plus its own key in the config schema if it needs
   settings.
-- **The web app** reads one fixed file name, `snapshot.json`, from the same directory (the file
-  adapter). Until P1 wires it to the newest `snapshot-<ISO>.json`, copy the one you want to
-  `snapshot.json` to see it there.
+- **The web app** reads the newest `snapshot-<ISO>.json` in `WATCHMAN_SNAPSHOT_DIR` (a hand-placed
+  `snapshot.json` when there is none), on the server, at most an hour old; see
+  [The web dashboard](#the-web-dashboard).
 
 | Source              | Adapter             | Feeds                                                                                                                                                                 | When it is missing                     |
 | ------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
@@ -226,6 +226,68 @@ ranking, throughput, staleness, totals, countdowns and stamps) matches core's. T
 checked over a ten-day sweep in three UTC offsets and on a snapshot built from every synthetic
 source.
 
+## The web dashboard
+
+`apps/web` is the v1 dashboard: one screen that says what needs the owner's yes, how work flows,
+what AI costs against each quota reset, and how quality trends. It is read-only: every item links
+out to where it is revised, halted or unblocked, and there is no approve, merge, halt or pay
+control anywhere.
+
+- **Home (`/`).** Four Metro tiles, most valuable first: **Attention** (the top five items waiting
+  on the owner, ranked by value and urgency in `packages/core`, each a link to where it is acted
+  on), **Flow** (done this week against last, open PRs and issues, stale items over three days, the
+  handoff board by state, the busiest projects), **Spend** (the month's cost in USD and COP, each
+  provider's quota against its reset with a countdown) and **Metrics** (projects reporting the
+  sixteen merge-priority metrics; "no data" until a scorecard source exists, never invented
+  values). Every tile carries its source and as-of stamp, marks manual and partial figures, and the
+  page shows the data's as-of time, its source, when the server last read it, and a "synthetic
+  data" badge on synthetic data.
+- **Drill-downs.** Each tile's title opens its view: `/attention` (every eligible item, ranked,
+  with value × urgency), `/flow` (per project, stale items, the board), `/spend` (per-provider cost
+  and quota with meters) and `/metrics` (sixteen metrics per project with trends). The pivot and a
+  "Back to start" link lead back.
+- **Layout.** "Customise tiles" shows, hides and reorders the tiles (checkboxes and move buttons,
+  all keyboard operable, changes announced), with a reset. The layout is kept in this browser's
+  `localStorage` (single user). An inline script in the root layout applies the saved layout as
+  CSS before the first paint, so a customised home never flashes the default; the server always
+  renders the default order, so hydration never mismatches.
+- **Data, server-side only.** Server components read the snapshot through `packages/core` in
+  `src/server/` (`server-only`): the newest `snapshot-<ISO>.json` in `WATCHMAN_SNAPSHOT_DIR`, or the
+  committed synthetic fixture `full.json` when the variable is unset. A configured directory that
+  cannot be read shows every tile as "no data" with the reason, never the fixture. The read is
+  cached with `use cache` and `cacheLife({ revalidate: 3600 })`, so every view re-reads at least
+  hourly (the build output lists each route at `Revalidate 1h`). The directory path, and any future
+  token, never reach a browser: `npm run build` ends with `scripts/check-client-bundle.mjs`, which
+  fails the build if the client bundle names the variable, Node's file system or the loader, or
+  (when the build ran with the variable set) contains its value anywhere in the client bundle or a
+  prerendered page.
+- **Checks in a browser (local, not CI).** `npm run build && npm run e2e --workspace @watchman/web`
+  runs Playwright against the production build on the installed Chrome: the four tiles, every
+  Attention deep link, each drill-down and the way back, no sideways scrolling at 390 px and
+  1440 px (with screenshots), keyboard layout customisation kept across a reload with no flash,
+  and home-view timings.
+
+### Deploying (owner only)
+
+Nothing is deployed yet, and no agent deploys it. Before any deploy exists, the owner:
+
+1. Creates the Vercel project with **root directory `apps/web`** (framework Next.js; install and
+   build run from the repository root through npm workspaces).
+2. Turns **Deployment Protection on** (Vercel Authentication for every deployment, production
+   included) before the first deploy, data-bearing or not.
+3. Leaves `WATCHMAN_SNAPSHOT_DIR` unset there: it is a local-only variable for the owner's
+   machine, and a deploy without it serves only the labelled synthetic fixture.
+4. Later, supplies real data server-side only: a new source adapter in `packages/core` that reads
+   from a protected store or API with a token held in the project's server environment (never a
+   `NEXT_PUBLIC_` variable), read by `src/server/` like the file adapter today. Each token's use
+   is approved by the owner.
+
+Locally, real data needs no deploy: build and start with the same variable,
+`WATCHMAN_SNAPSHOT_DIR=/path/outside/the/repo npm run build` then
+`WATCHMAN_SNAPSHOT_DIR=/path/outside/the/repo npm run start --workspace @watchman/web`. The
+prerendered pages then hold real figures in `apps/web/.next/`, which is git-ignored and never
+committed.
+
 ## Getting started
 
 Requires Node 24 (see `.nvmrc`) and npm 11.
@@ -246,6 +308,7 @@ network access: the layout self-hosts Open Sans (the Segoe-like fallback) throug
 
 ```bash
 npm run dev:web                              # apps/web on http://localhost:3000 (/theme previews the theme)
+npm run e2e --workspace @watchman/web        # Playwright on the production build (after npm run build)
 npm run start:mobile                         # apps/mobile: Expo dev server (Expo Go or a simulator)
 npm test --workspace @watchman/core          # one package's tests
 npm test --workspace @watchman/mcp
@@ -272,7 +335,8 @@ This repository is public. The rules below apply to every change:
   request; today `packages/mcp` holds only the transport guard it must call: stdio by default,
   and HTTP refused unless it is loopback-bound, requires a server-side bearer token and allows only
   loopback origins.
-- **The deployed web app sits behind access protection** before any data-bearing deploy exists.
+- **The deployed web app sits behind access protection** before any deploy exists (see
+  [Deploying](#deploying-owner-only)).
 - **Every pull request is scanned for secrets and PII before it opens.** The author runs the scan on
   the diff (for example `gitleaks` and `secretlint`, plus a grep for token shapes and real figures)
   and records the result in the pull request body. CI does not run this scan yet.

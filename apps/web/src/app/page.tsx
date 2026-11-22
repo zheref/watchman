@@ -1,37 +1,28 @@
-import { PageShell, PivotHeader, Tile, TileGrid } from '@/components/metro';
+import type { Metadata } from 'next';
+import { DashboardShell } from '@/components/dashboard/DashboardShell';
+import { TileBoard } from '@/components/dashboard/TileBoard';
+import { homeTiles } from '@/components/dashboard/home-tiles';
+import { getDashboardData } from '@/server/dashboard';
+
+export const metadata: Metadata = {
+  title: 'Watchman',
+  description: 'What needs your yes, how work flows, what AI costs and how quality trends.',
+};
 
 /**
- * Placeholder home. The real home view (the four live tiles and their drill-downs) is a later
- * phase; until then this page only proves the shared Metro theme and points at its preview.
+ * The home view: the four tiles, most valuable first, from the server-read snapshot. Every
+ * relative figure is measured from the snapshot's own as-of time, so a ranking, a stale count
+ * and a countdown agree with the figures beside them.
  */
-export default function Home() {
+export default async function Home() {
+  const data = await getDashboardData();
+  const now = new Date(data.snapshot.generated_at);
+  const tiles = homeTiles(data.snapshot, now, {
+    utcOffsetMinutes: data.snapshot.utc_offset_minutes,
+  });
   return (
-    <PageShell
-      header={
-        <PivotHeader
-          eyebrow="watchman"
-          title="start"
-          items={[
-            { label: 'start', href: '/', current: true },
-            { label: 'theme', href: '/theme' },
-          ]}
-        />
-      }
-    >
-      <TileGrid>
-        <Tile
-          title="Dashboard"
-          size="wide"
-          noData={{ reason: 'The four tiles arrive in a later release.' }}
-        />
-        <Tile
-          title="Theme preview"
-          accent="cobalt"
-          href="/theme"
-          value={<span aria-hidden="true">→</span>}
-          caption="See every tile state"
-        />
-      </TileGrid>
-    </PageShell>
+    <DashboardShell view="start" title="start" data={data}>
+      <TileBoard tiles={tiles} />
+    </DashboardShell>
   );
 }

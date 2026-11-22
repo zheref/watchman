@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/check-client-bundle.mjs",
     "start": "next start",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.38.0",
@@ -18,7 +19,9 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@types/react": "^19",
-    "@types/react-dom": "^19"
+    "@types/react-dom": "^19",
+    "happy-dom": "^21.0.4"
   }
 }

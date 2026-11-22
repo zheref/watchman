@@ -17,7 +17,9 @@ export interface PageShellProps {
  */
 export function PageShell({ header, children, footer }: PageShellProps) {
   return (
-    <chakra.div minHeight="100dvh" bg="bg" color="fg">
+    // `clip`, not `hidden`: entrance animations (the pivot title slides in from the right) never
+    // open a sideways scroll, and no scroll container is created.
+    <chakra.div minHeight="100dvh" bg="bg" color="fg" overflowX="clip">
       <chakra.a
         href="#main"
         position="absolute"

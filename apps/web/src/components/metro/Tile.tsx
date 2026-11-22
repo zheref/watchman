@@ -32,6 +32,13 @@ export interface TileProps {
   noData?: { reason: string };
   /** Turns the whole tile into a link (then `children` must hold no links of its own). */
   href?: string;
+  /**
+   * Makes the title a link whose hit area stretches over the whole tile, while links inside
+   * `children` stay their own targets above it. Use instead of `href` when the tile holds links.
+   */
+  titleHref?: string;
+  /** Extra words read after the title in the title link, e.g. "details". */
+  titleHrefHint?: string;
   /** A short badge top-right, e.g. "manual" or "partial". */
   badge?: string;
   /** Position in the grid, used to stagger the entrance animation (capped at 300 ms). */
@@ -39,6 +46,25 @@ export interface TileProps {
   /** Heading level of the title within the page; 2 by default. */
   headingLevel?: 2 | 3;
 }
+
+/**
+ * The title link's `::after` covers the tile, so the whole tile is the target; the tile's own
+ * links (`a` inside the body) are lifted above it. The focus ring is drawn on the cover, so it
+ * outlines the whole tile.
+ */
+const STRETCHED_LINK = {
+  color: 'inherit',
+  textDecoration: 'none',
+  outline: 'none',
+  '&::after': { content: '""', position: 'absolute', inset: '0', zIndex: 0 },
+  '&:focus-visible::after': {
+    outlineWidth: '3px',
+    outlineStyle: 'solid',
+    outlineColor: 'focusRing',
+    outlineOffset: '3px',
+  },
+  '&:hover': { textDecoration: 'underline' },
+} as const;
 
 /** The Metro tile: flat colour, square corners, a big light figure and its provenance. */
 export function Tile({
@@ -52,6 +78,8 @@ export function Tile({
   footer,
   noData,
   href,
+  titleHref,
+  titleHrefHint,
   badge,
   index = 0,
   headingLevel = 2,
@@ -77,7 +105,19 @@ export function Tile({
     >
       <chakra.div css={styles.header}>
         <Heading id={titleId} css={styles.title} data-part="title" m="0">
-          {title}
+          {titleHref === undefined || href !== undefined ? (
+            title
+          ) : (
+            <chakra.a href={titleHref} css={STRETCHED_LINK} data-part="title-link">
+              {title}
+              {titleHrefHint === undefined ? null : (
+                <chakra.span srOnly>{` ${titleHrefHint}`}</chakra.span>
+              )}
+              <chakra.span aria-hidden="true" ms="1">
+                ›
+              </chakra.span>
+            </chakra.a>
+          )}
         </Heading>
         {badge === undefined ? null : (
           <chakra.span css={styles.state} data-part="badge">
@@ -86,7 +126,14 @@ export function Tile({
         )}
       </chakra.div>
 
-      <chakra.div css={styles.body} data-part="body">
+      <chakra.div
+        css={
+          titleHref === undefined
+            ? styles.body
+            : { ...styles.body, '& a': { position: 'relative', zIndex: 1 } }
+        }
+        data-part="body"
+      >
         {missing ? (
           <>
             <chakra.p css={styles.value} data-part="value" m="0">

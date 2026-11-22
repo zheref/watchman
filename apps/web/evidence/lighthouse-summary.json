@@ -1,0 +1,53 @@
+{
+  "tool": "lighthouse",
+  "version": "13.6.0",
+  "method": "npx --yes lighthouse@13 http://127.0.0.1:3300/<route> --chrome-flags=--headless=new --only-categories=accessibility,performance,best-practices --output=json; against next start of the production build, synthetic fixture (WATCHMAN_SNAPSHOT_DIR unset); Lighthouse default mobile emulation with simulated throttling",
+  "routes": {
+    "/": {
+      "accessibility": 100,
+      "performance": 100,
+      "best_practices": 100,
+      "fcp_ms": 906,
+      "lcp_ms": 906,
+      "tbt_ms": 57,
+      "cls": 0
+    },
+    "/attention": {
+      "accessibility": 100,
+      "performance": 100,
+      "best_practices": 100,
+      "fcp_ms": 902,
+      "lcp_ms": 902,
+      "tbt_ms": 54,
+      "cls": 0
+    },
+    "/flow": {
+      "accessibility": 100,
+      "performance": 100,
+      "best_practices": 100,
+      "fcp_ms": 903,
+      "lcp_ms": 903,
+      "tbt_ms": 53,
+      "cls": 0
+    },
+    "/spend": {
+      "accessibility": 100,
+      "performance": 100,
+      "best_practices": 100,
+      "fcp_ms": 903,
+      "lcp_ms": 903,
+      "tbt_ms": 53,
+      "cls": 0
+    },
+    "/metrics": {
+      "accessibility": 100,
+      "performance": 100,
+      "best_practices": 100,
+      "fcp_ms": 902,
+      "lcp_ms": 902,
+      "tbt_ms": 48,
+      "cls": 0
+    }
+  },
+  "fetched_at": "2026-11-22T20:31:31.554Z"
+}

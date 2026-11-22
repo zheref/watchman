@@ -3,3 +3,4 @@ export { PivotHeader, type PivotHeaderProps, type PivotItem } from './PivotHeade
 export { Provenance, type ProvenanceStamp } from './Provenance';
 export { Tile, type TileProps, type TileSize } from './Tile';
 export { TileGrid } from './TileGrid';
+export { TileList, type TileListItem } from './TileList';

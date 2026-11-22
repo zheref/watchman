@@ -1,4 +1,4 @@
-import { SnapshotValidationError, parseSnapshot } from '../snapshot';
+import { SnapshotValidationError, parseSnapshot, type Snapshot } from '../snapshot';
 import type { PartialSnapshot, SourceAdapter } from './source';
 
 /**
@@ -48,6 +48,41 @@ export class SnapshotSourceError extends Error {
   }
 }
 
+/**
+ * The name `npm run snapshot` writes: `snapshot-2026-11-22T19-07-28Z.json` (see
+ * `snapshotFileName`). Its timestamp sorts lexically in time order.
+ */
+export const SNAPSHOT_FILE_PATTERN = /^snapshot-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z\.json$/;
+
+/**
+ * The newest snapshot among a directory's file names: the latest `snapshot-<ISO>.json`, or
+ * `null` when there is none. Any other name is ignored, so a stray or hand-named file is never
+ * read by accident.
+ */
+export function latestSnapshotFileName(names: readonly string[]): string | null {
+  let latest: string | null = null;
+  for (const name of names) {
+    if (SNAPSHOT_FILE_PATTERN.test(name) && (latest === null || name > latest)) latest = name;
+  }
+  return latest;
+}
+
+/**
+ * Decodes and validates one snapshot file's text. `source` names the file in errors (never a
+ * path); a JSON error keeps no cause, because a parser message quotes a fragment of the file.
+ */
+export function parseSnapshotText(text: string, source: string): Snapshot {
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new SnapshotSourceError(`${source}: not valid JSON`);
+  }
+  const result = parseSnapshot(json);
+  if (!result.ok) throw new SnapshotValidationError(result.issues, source);
+  return result.snapshot;
+}
+
 /** Builds the `file` source adapter. */
 export function createFileSnapshotAdapter(options: FileSnapshotAdapterOptions): SourceAdapter {
   const fileName = options.fileName ?? DEFAULT_SNAPSHOT_FILE;
@@ -75,16 +110,7 @@ export function createFileSnapshotAdapter(options: FileSnapshotAdapterOptions): 
           typeof code === 'string' ? { cause: { code } } : undefined,
         );
       }
-      let json: unknown;
-      try {
-        json = JSON.parse(text);
-      } catch {
-        // No cause: a parser error quotes a fragment of the file.
-        throw new SnapshotSourceError(`${source}: not valid JSON`);
-      }
-      const result = parseSnapshot(json);
-      if (!result.ok) throw new SnapshotValidationError(result.issues, source);
-      const { snapshot } = result;
+      const snapshot = parseSnapshotText(text, source);
       return {
         source,
         as_of: snapshot.generated_at,
