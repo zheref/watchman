@@ -2,6 +2,7 @@ export { compareText, topN, type Scorer } from './rank';
 export * from './provenance';
 export * from './snapshot';
 export * from './time';
+export * from './filters';
 export * from './attention';
 export * from './flow';
 export * from './spend';
