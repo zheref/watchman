@@ -1,5 +1,5 @@
 {
-  "$comment": "The artifact alone, as the claude.ai runtime sees it: React and the DOM, no Node types and nothing from this monorepo.",
+  "$comment": "The artifact alone, as the claude.ai runtime sees it: React and the DOM, no Node types and nothing from this monorepo. artifacts/ is not a workspace: react, react-dom and @types/react resolve from the root node_modules, where apps/web installs them.",
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",

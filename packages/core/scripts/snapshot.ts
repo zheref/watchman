@@ -13,6 +13,8 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   SNAPSHOT_DIR_ENV,
+  SnapshotSourceError,
+  SnapshotValidationError,
   buildSnapshot,
   describeSnapshotShape,
   isInsidePath,
@@ -57,11 +59,14 @@ export function parseArgs(argv: readonly string[]): CliArgs | { error: string } 
     else if (arg === '--no-github') args.github = false;
     else if (arg === '--out') {
       const value = argv[++i];
-      if (value === undefined || value.startsWith('--'))
+      if (value === undefined || value.startsWith('--') || value.trim() === '') {
         return { error: '--out needs a directory' };
+      }
       args.out = value;
-    } else if (arg.startsWith('--out=')) args.out = arg.slice('--out='.length);
-    else return { error: `unknown argument: ${arg}` };
+    } else if (arg.startsWith('--out=')) {
+      args.out = arg.slice('--out='.length);
+      if (args.out.trim() === '') return { error: '--out needs a directory' };
+    } else return { error: `unknown argument: ${arg}` };
   }
   return args;
 }
@@ -85,7 +90,14 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
   const dir = await deps.canonical(
     isAbsolute(chosen) ? resolve(chosen) : resolve(deps.cwd, chosen),
   );
-  const roots = await Promise.all((await deps.repoRoots()).map((root) => deps.canonical(root)));
+  let roots: string[];
+  try {
+    roots = await Promise.all((await deps.repoRoots()).map((root) => deps.canonical(root)));
+  } catch {
+    // Fail closed: without the list of checkouts, "outside the repository" cannot be proved.
+    deps.err("snapshot: could not list this repository's checkouts, so nothing was written");
+    return 3;
+  }
   if (roots.some((root) => isInsidePath(dir, root))) {
     deps.err(
       'snapshot: refusing to write inside the repository: real data must stay outside it. ' +
@@ -95,15 +107,21 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
   }
 
   const now = deps.now();
-  await deps.ensureDir(dir);
-  const built = await buildSnapshot({
-    dir,
-    readText: deps.readText,
-    now,
-    ...(args.github ? { runGh: deps.runGh } : {}),
-  });
   const file = snapshotFileName(now);
-  await deps.writeNew(`${dir}/${file}`, `${JSON.stringify(built.snapshot, null, 2)}\n`);
+  let built: Awaited<ReturnType<typeof buildSnapshot>>;
+  try {
+    await deps.ensureDir(dir);
+    built = await buildSnapshot({
+      dir,
+      readText: deps.readText,
+      now,
+      ...(args.github ? { runGh: deps.runGh } : {}),
+    });
+    await deps.writeNew(`${dir}/${file}`, `${JSON.stringify(built.snapshot, null, 2)}\n`);
+  } catch (error) {
+    deps.err(`snapshot: nothing was written: ${describeError(error)}`);
+    return 1;
+  }
 
   deps.out(`snapshot: wrote ${file} to the snapshot directory`);
   for (const line of describeSnapshotShape(built)) deps.out(`  ${line}`);
@@ -119,6 +137,18 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
   return built.failures.length > 0 ? 4 : 0;
 }
 
+/**
+ * A failure in words that carry no path and no data: core's own errors are written that way;
+ * anything else (Node's file errors name the absolute path) is reduced to its code.
+ */
+export function describeError(error: unknown): string {
+  if (error instanceof SnapshotSourceError || error instanceof SnapshotValidationError) {
+    return error.message;
+  }
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'string' ? `a file operation failed (${code})` : 'an unexpected error';
+}
+
 // --- Node wiring ---------------------------------------------------------------------------------
 
 export function run(file: string, args: readonly string[], cwd?: string): Promise<string> {
@@ -131,12 +161,11 @@ export function run(file: string, args: readonly string[], cwd?: string): Promis
         maxBuffer: 256 * 1024 * 1024,
         env: { ...process.env, GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', NO_COLOR: '1' },
       },
-      (error, stdout, stderr) => {
+      (error, stdout) => {
         if (error) {
-          const detail = String(stderr).trim().split('\n')[0] ?? '';
-          reject(
-            new Error(`${file} ${args.slice(0, 2).join(' ')} failed${detail ? `: ${detail}` : ''}`),
-          );
+          // Only the command and its exit status: stderr can name private repositories or paths.
+          const status = typeof error.code === 'number' ? ` (exit ${error.code})` : '';
+          reject(new Error(`${file} ${args.slice(0, 2).join(' ')} failed${status}`));
         } else resolvePromise(String(stdout));
       },
     );
@@ -166,13 +195,12 @@ export function nodeDeps(scriptDir: string): CliDeps {
     cwd: process.env.INIT_CWD ?? process.cwd(),
     now: () => new Date(),
     async repoRoots() {
-      const listing = await run('git', ['-C', repoRoot, 'worktree', 'list', '--porcelain']).catch(
-        () => '',
-      );
+      const listing = await run('git', ['-C', repoRoot, 'worktree', 'list', '--porcelain']);
       const worktrees = listing
         .split('\n')
         .filter((line) => line.startsWith('worktree '))
         .map((line) => line.slice('worktree '.length));
+      if (worktrees.length === 0) throw new Error('git listed no worktrees');
       return [repoRoot, ...worktrees];
     },
     readText: (path) => readFile(path, 'utf8'),
@@ -194,7 +222,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === self) {
       process.exitCode = code;
     },
     (error: unknown) => {
-      process.stderr.write(`snapshot: ${error instanceof Error ? error.message : String(error)}\n`);
+      process.stderr.write(`snapshot: ${describeError(error)}\n`);
       process.exitCode = 1;
     },
   );

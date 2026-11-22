@@ -119,10 +119,53 @@ describe('npm run snapshot', () => {
     expect(t.out).toContain('  github failed: gh is not signed in');
   });
 
-  it('never overwrites an existing snapshot', async () => {
+  it('never overwrites an existing snapshot, and names no path when a write fails', async () => {
     const t = deps({ env: { WATCHMAN_SNAPSHOT_DIR: '/synthetic/data' } });
-    await main([], t.d);
-    await expect(main([], t.d)).rejects.toThrow('EEXIST');
+    expect(await main([], t.d)).toBe(0);
+    const u = deps({
+      env: { WATCHMAN_SNAPSHOT_DIR: '/synthetic/data' },
+      writeNew: (path) =>
+        Promise.reject(
+          Object.assign(new Error(`EEXIST: file already exists, open '${path}'`), {
+            code: 'EEXIST',
+          }),
+        ),
+    });
+    expect(await main([], u.d)).toBe(1);
+    expect(u.err).toEqual(['snapshot: nothing was written: a file operation failed (EEXIST)']);
+    const v = deps({
+      env: { WATCHMAN_SNAPSHOT_DIR: '/synthetic/data' },
+      readText: (path) =>
+        path.endsWith('watchman.config.json')
+          ? Promise.resolve('{')
+          : Promise.reject(Object.assign(new Error('x'), { code: 'ENOENT' })),
+    });
+    expect(await main([], v.d)).toBe(1);
+    expect(v.err).toEqual(['snapshot: nothing was written: watchman.config.json: not valid JSON']);
+    const w = deps({
+      env: { WATCHMAN_SNAPSHOT_DIR: '/synthetic/data' },
+      ensureDir: () => Promise.reject(new Error('odd')),
+    });
+    expect(await main([], w.d)).toBe(1);
+    expect(w.err).toEqual(['snapshot: nothing was written: an unexpected error']);
+  });
+
+  it('fails closed when the checkouts cannot be listed', async () => {
+    const t = deps({
+      env: { WATCHMAN_SNAPSHOT_DIR: '/synthetic/data' },
+      repoRoots: () => Promise.reject(new Error('no git')),
+    });
+    expect(await main([], t.d)).toBe(3);
+    expect(t.err[0]).toBe(
+      "snapshot: could not list this repository's checkouts, so nothing was written",
+    );
+    expect(t.written.size).toBe(0);
+    expect(t.made).toEqual([]);
+  });
+
+  it('refuses an empty --out instead of falling back to the environment', () => {
+    expect(parseArgs(['--out', ' '])).toEqual({ error: '--out needs a directory' });
+    expect(parseArgs(['--out='])).toEqual({ error: '--out needs a directory' });
   });
 });
 
@@ -169,13 +212,17 @@ describe('the Node wiring', () => {
     expect(err[0]).toContain('refusing to write inside the repository');
   });
 
-  it('runs a program and reports a failure by its first stderr line only', async () => {
+  it('runs a program and reports a failure by its exit status only, never its stderr', async () => {
     await expect(run('node', ['-e', 'process.stdout.write("ok")'])).resolves.toBe('ok');
-    await expect(
-      run('node', ['-e', 'process.stderr.write("first\\nsecond\\n"); process.exit(1)']),
-    ).rejects.toThrow(
-      'node -e process.stderr.write("first\\nsecond\\n"); process.exit(1) failed: first',
-    );
-    await expect(run('node', ['-e', 'process.exit(2)'])).rejects.toThrow(/failed$/);
+    const error = (await run('node', [
+      '-e',
+      'process.stderr.write("private-repo-name"); process.exit(3)',
+    ]).then(
+      () => null,
+      (e: unknown) => e,
+    )) as Error;
+    expect(error.message).toMatch(/ failed \(exit 3\)$/);
+    expect(error.message.split(' failed')[1]).not.toContain('private-repo-name');
+    await expect(run('/nonexistent/binary', [])).rejects.toThrow(/^\/nonexistent\/binary +failed$/);
   });
 });

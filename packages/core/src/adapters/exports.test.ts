@@ -78,8 +78,8 @@ describe('handoff board adapter', () => {
     });
     expect(flow.work_items.every((w) => w.kind === 'card' && w.manual === true)).toBe(true);
     expect(attention.candidates.map((c) => [c.id, c.kind, c.value, c.waiting_since])).toEqual([
-      ['handoff:card-1', 'blocked_card', 4, '2026-01-08T10:00:00Z'],
-      ['handoff:card-2', 'owner_decision', 3, '2026-01-13T10:00:00Z'],
+      ['handoff-board:card-1', 'blocked_card', 4, '2026-01-08T10:00:00Z'],
+      ['handoff-board:card-2', 'owner_decision', 3, '2026-01-13T10:00:00Z'],
     ]);
   });
 
@@ -283,8 +283,8 @@ describe('every export together', () => {
     expect(snapshot.flow.manual).toBe(true);
     // card-1: value 4 × urgency 4 (six days blocked) = 16; card-2: 3 × 5 (due within a day) = 15.
     expect(rankAttention(snapshot.attention.candidates, NOW).map((c) => c.id)).toEqual([
-      'handoff:card-1',
-      'handoff:card-2',
+      'handoff-board:card-1',
+      'handoff-board:card-2',
       'ai-services:svc-1',
       'cloud-runs:run-1',
     ]);

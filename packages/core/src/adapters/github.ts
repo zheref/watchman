@@ -53,6 +53,8 @@ const repoSchema = z.object({
   isFork: z.boolean(),
   /** A repository with issues turned off answers `gh issue list` with an error, so it is not asked. */
   hasIssuesEnabled: z.boolean().default(true),
+  /** A fork's upstream: excluded material must not slip in under a neutral fork name. */
+  parent: z.object({ name: z.string(), owner: z.object({ login: z.string() }) }).nullish(),
 });
 const milestoneSchema = z.object({ dueOn: iso.nullish() }).nullish();
 const reviewRequestSchema = z.object({ login: z.string().optional() });
@@ -271,8 +273,9 @@ export function createGitHubAdapter(options: GitHubAdapterOptions): SourceAdapte
     return {
       project: {
         project: repo.name,
-        open_prs: openPrs.length,
-        open_issues: openIssues.length,
+        // Counted after the exclusion, so a count never includes an item the snapshot dropped.
+        open_prs: openPrs.filter(keep).length,
+        open_issues: openIssues.filter(keep).length,
         ...stamp,
       },
       items,
@@ -282,6 +285,7 @@ export function createGitHubAdapter(options: GitHubAdapterOptions): SourceAdapte
 
   return {
     id: GITHUB_SOURCE,
+    feeds: ['attention', 'flow'],
     async fetch(context: SourceAdapterContext): Promise<PartialSnapshot> {
       const now = context.now;
       const asOf = now.toISOString();
@@ -295,13 +299,18 @@ export function createGitHubAdapter(options: GitHubAdapterOptions): SourceAdapte
           '--limit',
           String(GH_LIST_LIMIT),
           '--json',
-          'name,owner,isArchived,isFork,hasIssuesEnabled',
+          'name,owner,isArchived,isFork,hasIssuesEnabled,parent',
         ]),
         'repositories',
       )
         .filter((r) => r.owner.login.toLowerCase() === owner.toLowerCase())
         .filter((r) => options.includeArchived === true || !r.isArchived)
         .filter((r) => options.includeForks === true || !r.isFork)
+        .filter(
+          (r) =>
+            !r.parent ||
+            (!isAlwaysExcluded(r.parent.owner.login) && !isAlwaysExcluded(r.parent.name)),
+        )
         .map((r) => ({ owner: r.owner.login, name: r.name, hasIssues: r.hasIssuesEnabled }))
         .filter((r) => !excluded(r));
 

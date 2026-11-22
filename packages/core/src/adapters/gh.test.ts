@@ -17,6 +17,9 @@ describe('assertReadOnlyGh', () => {
     [['repo', 'list', 'sample-owner', '--json', 'name']],
     [['pr', 'list', '--repo', 'sample-owner/alpha', '--state', 'open']],
     [['issue', 'list', '--repo', 'sample-owner/alpha', '--search', 'closed:>=2026-01-05']],
+    [['api', 'user', '--jq', '.login']],
+    [['pr', 'list', '--repo=sample-owner/alpha', '--state=open', '-L', '10']],
+    [['repo', 'list', '--source', '--no-archived']],
   ])('allows the read %j', (args) => {
     expect(() => assertReadOnlyGh(args)).not.toThrow();
   });
@@ -39,6 +42,22 @@ describe('assertReadOnlyGh', () => {
     [['repo', 'delete', 'a/b']],
     [['pr', 'list', '--web']],
     [['auth', 'token']],
+    // Attached and bundled short flags, flags hiding the path, stray arguments.
+    [['api', 'repos/o/r/issues', '-ftitle=x']],
+    [['api', 'repos/o/r/issues', '-Ftitle=x']],
+    [['api', '-iXPOST', 'repos/o/r']],
+    [['api', '-iX', 'DELETE', 'repos/o/r']],
+    [['api', '-H', 'Accept: x', 'graphql', '-fquery=mutation']],
+    [['api', '--jq', '.x', 'graphql']],
+    [['api', 'user', 'extra']],
+    [['pr', 'list', '-ws', 'open']],
+    [['pr', 'list', '--state']],
+    [['pr', 'list', 'stray']],
+    [['repo', 'list', '--source=yes']],
+    [['repo', 'list', 'a', 'b']],
+    [['api', 'https://evil.example/x']],
+    [['api', 'repos/o/../../x']],
+    [['api', 'repos/o/r issues']],
   ])('refuses %j', (args) => {
     expect(() => assertReadOnlyGh(args)).toThrow(GhWriteRefusedError);
   });
@@ -66,6 +85,19 @@ describe('exclusions', () => {
     expect(excluded({ owner: 'GlobalLogic', name: 'anything' })).toBe(true);
     expect(excluded({ owner: 'sample-owner', name: 'alpha' })).toBe(false);
     expect(isAlwaysExcluded('https://example.com/insulet/x')).toBe(true);
+    // Spacing, punctuation, case, width and zero-width characters do not get round it.
+    for (const text of [
+      'Global Logic',
+      'global_logic',
+      'GLOBAL-LOGIC',
+      'ｇｌｏｂａｌｌｏｇｉｃ',
+      'in\u200bsulet',
+      'In.Su.Let',
+    ]) {
+      expect(isAlwaysExcluded(text)).toBe(true);
+    }
+    expect(isAlwaysExcluded('a global logical step')).toBe(true);
+    expect(isAlwaysExcluded('Sample insurance list')).toBe(false);
   });
 
   it('matches configured names, owner/name pairs and globs case-insensitively', () => {

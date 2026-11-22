@@ -31,6 +31,7 @@ export interface FakeRepo {
   isArchived?: boolean;
   isFork?: boolean;
   hasIssues?: boolean;
+  parent?: { owner: string; name: string };
   openPrs?: FakePr[];
   mergedPrs?: FakePr[];
   openIssues?: FakeIssue[];
@@ -72,6 +73,7 @@ export function fakeGh(world: FakeWorld): { run: GhRunner; calls: string[][] } {
             isArchived: r.isArchived ?? false,
             isFork: r.isFork ?? false,
             hasIssuesEnabled: r.hasIssues ?? true,
+            parent: r.parent ? { name: r.parent.name, owner: { login: r.parent.owner } } : null,
           })),
       );
     }

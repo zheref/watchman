@@ -90,7 +90,8 @@ export function noData(reason: string, source: string, asOf: string): NoData {
  */
 export function combineProvenance(records: readonly Provenance[]): Provenance {
   if (records.length === 0) throw new RangeError('combineProvenance needs at least one record');
-  const sources = [...new Set(records.map((r) => r.source))].sort();
+  // A record's source may itself be a combined label (`a + b`); name each part once.
+  const sources = [...new Set(records.flatMap((r) => r.source.split(' + ')))].sort();
   let oldest = records[0]!.as_of;
   for (const r of records) if (Date.parse(r.as_of) < Date.parse(oldest)) oldest = r.as_of;
   const manual = records.some((r) => r.manual === true);

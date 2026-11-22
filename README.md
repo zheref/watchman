@@ -44,6 +44,12 @@ This is one npm-workspaces monorepo (npm only: no pnpm, yarn or bun, and one roo
 | `packages/mcp`  | `@watchman/mcp`    | The read-only MCP server. Today: no server and no SDK, only the transport guard that keeps it on stdio or a loopback address, and its tests.     |
 | `artifacts`     | (not a package)    | `watchman-v0.tsx`, the single-file Claude artifact (v0), and the test that keeps it in step with `packages/core`.                                |
 
+`packages/core/scripts/` holds the one Node entry point, the `npm run snapshot` command. It sits
+outside `src/` (which stays free of platform APIs, as the lint rule enforces) and has its own
+tsconfig; whether it should become its own package is part of the topology question in #8.
+`artifacts/` declares no dependencies of its own: its React, React DOM and React types resolve
+from the root `node_modules`, where `apps/web` installs them.
+
 Shared tooling lives at the root: `tsconfig.base.json` (every workspace extends it), one
 `eslint.config.mjs` (typescript-eslint everywhere, plus Next's rules for `apps/web`), one Prettier
 config, and a Vitest config that runs every `packages/*` project, `apps/web` and `artifacts`. `apps/mobile` has
@@ -64,7 +70,11 @@ Everything the dashboard shows comes from one versioned document, the **snapshot
   merged section may be incomplete.
 - A figure combined from several records (a total, a count across projects) carries their
   combined stamp: the **oldest** `as_of`, every source, and `manual` if any part was typed in.
-- Week and month boundaries are UTC unless the caller passes the owner's `utcOffsetMinutes`.
+- Week and month boundaries are UTC unless the caller passes the owner's `utcOffsetMinutes`. A
+  built snapshot carries the owner's offset as `utc_offset_minutes`, and the artifact honours it.
+- A built snapshot also lists its `sources`: each adapter, the sections it `feeds`, its `status`
+  (`value`, `no_data` or `failed`) and the reason. That is how a reader of the file alone can tell
+  a complete section from one merged without a source that failed or had no data.
 - The adapters: a **file** adapter that reads a whole snapshot from the directory in
   `WATCHMAN_SNAPSHOT_DIR` (server-side only, no default; see `apps/web/src/server/snapshot.ts`;
   unset means "no data"), a read-only **GitHub** adapter, four **manual-export** adapters and a
@@ -99,10 +109,19 @@ npm run snapshot -- --out /path/outside/the/repo [--no-github]
   directory is created owner-only if missing, the file is written owner-readable, and an existing
   file is never overwritten.
 - **What it prints.** Only the snapshot's shape: which sections hold values, list sizes, and which
-  sources had no data or failed. Figures, titles and names stay in the file. A source that failed
-  still leaves a written snapshot (its sections read "no data"), and the command exits 4.
-- **Sources.** Each is an adapter in `packages/core/src/adapters/`; a later source (analytics, the
-  scorecard) is one more adapter in `snapshotAdapters`.
+  sources had no data or failed. Figures, titles and names stay in the file, and an error names
+  no path and quotes no `gh` output (only the command and its exit status, or a file error's code).
+- **Exit codes.** `0` written; `4` written, but a source failed (the snapshot's `sources` say which,
+  and the tiles it feeds read "partial"); `2` no directory or a bad argument; `3` the directory is
+  inside a checkout, or the checkouts could not be listed (it fails closed); `1` nothing was
+  written (a config, read or write error).
+- **Sources.** Each is an adapter in `packages/core/src/adapters/`. A later source (analytics, a
+  real scorecard) is a new adapter added to `snapshotAdapters` (replacing the `scorecard`
+  placeholder, since adapter ids are unique), plus its own key in the config schema if it needs
+  settings.
+- **The web app** reads one fixed file name, `snapshot.json`, from the same directory (the file
+  adapter). Until P1 wires it to the newest `snapshot-<ISO>.json`, copy the one you want to
+  `snapshot.json` to see it there.
 
 | Source              | Adapter             | Feeds                                                                                                                                                                 | When it is missing                     |
 | ------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
@@ -116,15 +135,18 @@ npm run snapshot -- --out /path/outside/the/repo [--no-github]
 ### GitHub
 
 The adapter runs the `gh` CLI the owner is already signed in to, through a guard that allows only
-reads (`gh api` GETs with no body, `gh repo list`, `gh pr list`, `gh issue list`; GraphQL and every
-write flag are refused). It reads the repositories of one **personal account** (the signed-in one
+reads: `gh api` with a plain REST path and no method, body, header or input flag (so only a GET),
+and `gh repo list`, `gh pr list` and `gh issue list`, each with an explicit allow-list of flags.
+Every other command or flag, bundled or attached short flags included, and GraphQL, is refused. It reads the repositories of one **personal account** (the signed-in one
 unless the config names another) and refuses an organisation. Archived repositories and forks
 are skipped unless the config includes them, and repositories with issues turned off are not
 asked for issues. A PR's milestone due date becomes its Attention deadline.
 
-**Built-in exclusion.** Any repository whose owner or name contains `globallogic` or `insulet`
-(any case) is dropped from the repository list before anything else about it is read, and an
-item whose title or link mentions either is dropped too. This cannot be switched off.
+**Built-in exclusion.** Any repository whose owner or name contains `globallogic` or `insulet`,
+or that is a fork of one that does, is dropped from the repository list before anything else about
+it is read. Then, before the file is written, every record of the merged snapshot that mentions
+either (from any source, the manual exports included) is removed. Matching ignores case, spacing,
+punctuation, full-width and zero-width characters. This cannot be switched off.
 
 ### The config file
 
@@ -145,7 +167,8 @@ a synthetic example is `packages/core/fixtures/synthetic/exports/watchman.config
 ```
 
 `exclude` takes exact names, `owner/name` pairs and globs (`*`, `?`), case-insensitive.
-`utcOffsetMinutes` sets where the owner's week starts for throughput.
+`utcOffsetMinutes` sets where the owner's week starts for the GitHub read window, and is written
+into the snapshot as `utc_offset_minutes` so the artifact counts weeks and months the same way.
 
 ### The manual export formats
 
@@ -181,10 +204,27 @@ badged "synthetic"). To see real data:
    the problems listed and the current view kept. The pasted data stays in the page's memory.
 
 Every figure shows its source and as-of time, missing data reads "no data" with its reason,
-hand-typed figures are marked "manual", and every Attention item links to where it is acted on.
-`artifacts/watchman-v0.test.tsx` type-checks the file on its own, checks it imports only React and
-touches no network or storage API, asserts its embedded sample equals the committed fixture, and
-checks its validator and tile logic agree with `packages/core` on every fixture.
+hand-typed figures are marked "manual", and every Attention item links to where it is acted on. A
+tile fed by a source that failed reads "partial: <source> failed", and one fed by a source with no
+data lists it as missing, from the snapshot's `sources`. Weeks and months follow the snapshot's
+`utc_offset_minutes`, and every tile is shown as at the moment the snapshot was taken. Flow names
+its eight busiest projects and counts the rest in its totals.
+
+The file is TypeScript with the automatic JSX runtime (hooks imported by name, no default `React`
+import). Whether claude.ai accepts it as pasted is confirmed when the owner first pastes it.
+
+`artifacts/watchman-v0.test.tsx` keeps the copy honest. It checks that the file:
+
+- type-checks on its own with React and the DOM only;
+- imports only React and touches no network or storage API;
+- embeds a sample equal to the committed fixture;
+- copies every core constant unchanged.
+
+It then runs the artifact's validator against core's on every fixture, on more than 3,000
+single-value mutations of `full.json` and on edge-case dates, and checks that the tile logic (the
+ranking, throughput, staleness, totals, countdowns and stamps) matches core's. That logic is
+checked over a ten-day sweep in three UTC offsets and on a snapshot built from every synthetic
+source.
 
 ## Getting started
 

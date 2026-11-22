@@ -15,38 +15,101 @@ export class GhWriteRefusedError extends Error {
   }
 }
 
-/** `gh` subcommands that only read. Anything else is refused. */
-const READ_ONLY_LISTS = new Set(['pr list', 'issue list', 'repo list']);
-
 /**
- * Flags that turn `gh api` into a write (`-X`/`--method`, or a request body: `-f`, `-F`,
- * `--field`, `--raw-field`, `--input`) or open a browser.
+ * The only commands allowed, each with the only flags it may carry (`true`: the flag takes a
+ * value, given as `--flag value` or `--flag=value`; `false`: a switch) and how many positional
+ * arguments it takes. Anything else — another command, flag, attached short flag (`-fbody=x`),
+ * or a positional that looks like a flag — is refused. `gh api` has no body, method, header or
+ * input flag here, so it can only GET; GraphQL is refused by path, since it is a POST and a
+ * mutation would look like any other query.
  */
-const WRITE_FLAG = /^(?:-X|--method|-f|-F|--field|--raw-field|--input|--web|-w)(?:=.*)?$/;
+const ALLOWED: Record<string, { flags: Record<string, boolean>; positionals: [number, number] }> = {
+  api: {
+    flags: { '--paginate': false, '--jq': true, '-q': true, '--hostname': true },
+    positionals: [1, 1],
+  },
+  'repo list': {
+    flags: {
+      '--limit': true,
+      '-L': true,
+      '--json': true,
+      '--source': false,
+      '--no-archived': false,
+    },
+    positionals: [0, 1],
+  },
+  'pr list': {
+    flags: {
+      '--repo': true,
+      '-R': true,
+      '--state': true,
+      '-s': true,
+      '--limit': true,
+      '-L': true,
+      '--search': true,
+      '-S': true,
+      '--json': true,
+    },
+    positionals: [0, 0],
+  },
+  'issue list': {
+    flags: {
+      '--repo': true,
+      '-R': true,
+      '--state': true,
+      '-s': true,
+      '--limit': true,
+      '-L': true,
+      '--search': true,
+      '-S': true,
+      '--json': true,
+    },
+    positionals: [0, 0],
+  },
+};
 
-/**
- * Refuses any `gh` invocation that is not a plain read: `gh api <REST path>` as a GET with no
- * body, or `gh pr list`, `gh issue list`, `gh repo list`. GraphQL is refused too: it is a POST,
- * and a mutation would look like any other query to this guard.
- */
+/** Refuses any `gh` invocation that is not one of the plain reads in {@link ALLOWED}. */
 export function assertReadOnlyGh(args: readonly string[]): void {
   const [command, sub] = args;
   if (command === undefined) throw new GhWriteRefusedError('refused: empty gh command');
-  for (const arg of args) {
-    if (WRITE_FLAG.test(arg) || /^-X./.test(arg)) {
-      throw new GhWriteRefusedError(`refused: gh flag ${arg} can write or open a browser`);
+  const key = command === 'api' ? 'api' : `${command} ${sub ?? ''}`;
+  const rule = ALLOWED[key];
+  if (rule === undefined) {
+    throw new GhWriteRefusedError(`refused: gh ${key.trim()} is not a read-only command`);
+  }
+  const rest = args.slice(command === 'api' ? 1 : 2);
+  const positionals: string[] = [];
+  for (let i = 0; i < rest.length; i++) {
+    const arg = rest[i]!;
+    if (!arg.startsWith('-')) {
+      positionals.push(arg);
+      continue;
     }
+    const eq = arg.indexOf('=');
+    const name = eq > 0 && arg.startsWith('--') ? arg.slice(0, eq) : arg;
+    const takesValue = rule.flags[name];
+    if (takesValue === undefined) {
+      throw new GhWriteRefusedError(`refused: gh flag ${name} is not allowed on gh ${key.trim()}`);
+    }
+    if (takesValue && name === arg) {
+      if (i + 1 >= rest.length) throw new GhWriteRefusedError(`refused: ${name} needs a value`);
+      i += 1;
+    } else if (!takesValue && name !== arg) {
+      throw new GhWriteRefusedError(`refused: ${name} takes no value`);
+    }
+  }
+  const [min, max] = rule.positionals;
+  if (positionals.length < min || positionals.length > max) {
+    throw new GhWriteRefusedError(`refused: gh ${key.trim()} takes ${min}–${max} plain arguments`);
   }
   if (command === 'api') {
-    const path = args.slice(1).find((a) => !a.startsWith('-'));
-    if (path === undefined) throw new GhWriteRefusedError('refused: gh api without a path');
-    if (/^\/?graphql\b/i.test(path)) {
+    const path = positionals[0]!;
+    if (/^\/?graphql\b/i.test(path))
       throw new GhWriteRefusedError('refused: gh api graphql is a POST');
+    if (!/^[A-Za-z0-9_./-]+(?:\?[A-Za-z0-9_.=&%-]*)?$/.test(path) || path.includes('..')) {
+      throw new GhWriteRefusedError('refused: gh api path is not a plain REST path');
     }
-    return;
   }
-  if (sub !== undefined && READ_ONLY_LISTS.has(`${command} ${sub}`)) return;
-  throw new GhWriteRefusedError(`refused: gh ${command} ${sub ?? ''} is not a read-only command`);
 }
 
 /** Wraps a runner so that every call is checked by {@link assertReadOnlyGh} before it runs. */

@@ -187,6 +187,29 @@ describe('createGitHubAdapter', () => {
     ]);
   });
 
+  it('skips a fork whose upstream is NDA material, even under a neutral name', async () => {
+    const w = world();
+    w.repos.push({
+      owner: 'sample-owner',
+      name: 'pump-sdk',
+      isFork: true,
+      parent: { owner: 'Insulet', name: 'sdk' },
+    });
+    w.repos.push({
+      owner: 'sample-owner',
+      name: 'neutral-fork',
+      isFork: true,
+      parent: { owner: 'someone', name: 'lib' },
+    });
+    const gh = fakeGh(w);
+    await createGitHubAdapter({ run: gh.run, includeForks: true }).fetch({ now: NOW });
+    const repos = gh.calls
+      .filter((c) => c.includes('--repo'))
+      .map((c) => c[c.indexOf('--repo') + 1]);
+    expect(repos).not.toContain('sample-owner/pump-sdk');
+    expect(repos).toContain('sample-owner/neutral-fork');
+  });
+
   it('drops items whose title or link mentions NDA material', async () => {
     const w = world();
     w.repos[0]!.openIssues!.push({
@@ -197,6 +220,10 @@ describe('createGitHubAdapter', () => {
     });
     const report = await createGitHubAdapter({ run: fakeGh(w).run }).fetch({ now: NOW });
     expect(JSON.stringify(report)).not.toMatch(/insulet/i);
+    const flow = report.sections.flow!;
+    if (flow.state !== 'value') throw new Error('expected a value');
+    // The count leaves the dropped item out too.
+    expect(flow.projects.find((p) => p.project === 'alpha')?.open_issues).toBe(2);
   });
 
   it('makes only read-only gh calls', async () => {

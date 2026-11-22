@@ -214,6 +214,7 @@ function boardColumns(data: HandoffBoardExport): { name: string; count: number }
 export function createHandoffBoardAdapter(options: ExportAdapterOptions): SourceAdapter {
   return {
     id: 'handoff-board',
+    feeds: ['attention', 'flow'],
     async fetch(context: SourceAdapterContext): Promise<PartialSnapshot> {
       const read = await readExport(options, 'handoff-board', handoffBoardExportSchema);
       const now = context.now.toISOString();
@@ -239,14 +240,16 @@ export function createHandoffBoardAdapter(options: ExportAdapterOptions): Source
             state: 'value',
             ...stamp,
             candidates: data.cards
-              .map((card) => toCandidate('handoff', card, source, data.as_of))
+              .map((card) => toCandidate('handoff-board', card, source, data.as_of))
               .filter((c): c is AttentionCandidate => c !== null),
           },
           flow: {
             state: 'value',
             ...stamp,
             projects: [],
-            work_items: data.cards.map((card) => toWorkItem('handoff', card, source, data.as_of)),
+            work_items: data.cards.map((card) =>
+              toWorkItem('handoff-board', card, source, data.as_of),
+            ),
             board: { state: 'value', ...stamp, columns: boardColumns(data) },
           },
         },
@@ -263,6 +266,7 @@ export function createTrackerAdapter(
   const schema = kind === 'ai-services' ? aiServicesExportSchema : cloudRunsExportSchema;
   return {
     id: kind,
+    feeds: ['attention', 'flow'],
     async fetch(context: SourceAdapterContext): Promise<PartialSnapshot> {
       const read = await readExport(options, kind, schema as z.ZodType<TrackerExport>);
       const now = context.now.toISOString();
@@ -308,6 +312,7 @@ export function createTrackerAdapter(
 export function createAiSurfacesSpendAdapter(options: ExportAdapterOptions): SourceAdapter {
   return {
     id: 'ai-surfaces-spend',
+    feeds: ['spend'],
     async fetch(context: SourceAdapterContext): Promise<PartialSnapshot> {
       const read = await readExport(options, 'ai-surfaces-spend', aiSurfacesSpendExportSchema);
       const now = context.now.toISOString();
@@ -365,6 +370,7 @@ export function createAiSurfacesSpendAdapter(options: ExportAdapterOptions): Sou
 export function createScorecardPlaceholderAdapter(): SourceAdapter {
   return {
     id: 'scorecard',
+    feeds: ['metrics'],
     fetch(context: SourceAdapterContext): Promise<PartialSnapshot> {
       const now = context.now.toISOString();
       return Promise.resolve({

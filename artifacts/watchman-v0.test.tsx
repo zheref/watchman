@@ -11,10 +11,17 @@ import {
   throughput as coreThroughput,
   type Snapshot as CoreSnapshot,
 } from '@watchman/core';
+import * as Core from '@watchman/core';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { ACCENTS } from '../apps/web/src/theme/palette';
+import aiServices from '../packages/core/fixtures/synthetic/exports/ai-services.json';
+import spendSheet from '../packages/core/fixtures/synthetic/exports/ai-surfaces-spend.json';
+import cloudRuns from '../packages/core/fixtures/synthetic/exports/cloud-runs.json';
+import handoff from '../packages/core/fixtures/synthetic/exports/handoff-board.json';
+import { fakeGh } from '../packages/core/src/test/fake-gh';
+import * as Artifact from './watchman-v0';
 import WatchmanV0, {
   METRO,
   SYNTHETIC_SNAPSHOT,
@@ -491,5 +498,307 @@ describe('rendering', () => {
     if (base.flow.state !== 'value') throw new Error('expected flow');
     const t = tile(html(mine({ ...base, flow: { ...base.flow, projects: [] } })), 'flow');
     expect(t).toContain('open PRs and issues: no data (no project reported counts)');
+  });
+});
+
+describe('the drift guard', () => {
+  it('copies every constant core defines, unchanged', () => {
+    expect(Artifact.ATTENTION_LIMIT).toBe(Core.ATTENTION_LIMIT);
+    expect(Artifact.PR_WAIT_THRESHOLD_HOURS).toBe(Core.PR_WAIT_THRESHOLD_HOURS);
+    expect(Artifact.STALE_AFTER_DAYS).toBe(Core.STALE_AFTER_DAYS);
+    expect(Artifact.AS_OF_SKEW_MS).toBe(Core.AS_OF_SKEW_MS);
+    expect(Artifact.METRIC_NAMES).toEqual([...Core.METRIC_NAMES]);
+    expect([...Artifact.ATTENTION_KINDS]).toEqual([...Core.ATTENTION_KINDS]);
+    expect([...Artifact.WORK_ITEM_KINDS]).toEqual([...Core.WORK_ITEM_KINDS]);
+    expect([...Artifact.SECTION_KEYS]).toEqual([...Core.SECTION_KEYS]);
+    expect([...Artifact.SOURCE_STATUSES]).toEqual([...Core.SOURCE_STATUSES]);
+  });
+
+  it('combines stamps exactly as core does', () => {
+    for (const json of Object.values(FIXTURES)) {
+      const c = core(json);
+      const records = [
+        ...(c.attention.state === 'value' ? c.attention.candidates : []),
+        ...(c.flow.state === 'value' ? [...c.flow.projects, ...c.flow.work_items] : []),
+        ...(c.spend.state === 'value'
+          ? c.spend.providers.flatMap((p) => [p.quota, p.monthly_cost])
+          : []),
+      ];
+      for (let n = 1; n <= records.length; n += 3) {
+        expect(Artifact.combineStamps(records.slice(0, n))).toEqual(
+          Core.combineProvenance(records.slice(0, n)),
+        );
+      }
+    }
+  });
+
+  // Every fixture, across ten days from its own instant, in three owner offsets.
+  const SWEEP: [string, number, number][] = Object.keys(FIXTURES).flatMap((name) =>
+    [0, -300, 330].flatMap((offset) =>
+      Array.from({ length: 35 }, (_, i) => [name, offset, i * 7] as [string, number, number]),
+    ),
+  );
+
+  it('ranks, counts and totals as core does over a time and offset sweep', () => {
+    for (const [name, offset, hours] of SWEEP) {
+      const json = FIXTURES[name];
+      const c = core(json);
+      const m = mine(json);
+      const now = new Date(Date.parse(m.generated_at) + hours * 3600_000);
+      const at = `${name} +${hours}h @${offset}`;
+      if (c.attention.state === 'value' && m.attention.state === 'value') {
+        expect(
+          rankAttention(m.attention.candidates, now).map((i) => [i.id, i.score, i.urgency]),
+          at,
+        ).toEqual(coreRank(c.attention.candidates, now).map((i) => [i.id, i.score, i.urgency]));
+      }
+      if (c.flow.state === 'value' && m.flow.state === 'value') {
+        const t = coreThroughput(c.flow.work_items, now, { utcOffsetMinutes: offset });
+        expect(throughput(m.flow.work_items, now, offset), at).toEqual({
+          this_week: t.this_week,
+          last_week: t.last_week,
+          delta: t.delta,
+        });
+        expect(staleCount(m.flow.work_items, now), at).toBe(
+          staleItems(c.flow.work_items, now).length,
+        );
+      }
+      expect(monthOf(now, offset), at).toBe(coreMonthOf(now, offset));
+      if (c.spend.state === 'value' && m.spend.state === 'value') {
+        const month = coreMonthOf(now, offset);
+        const ct = monthlySpendTotal(c.spend.providers, month, c.spend.as_of);
+        const mt = monthlyTotal(m.spend.providers, month);
+        expect(mt.state, at).toBe(ct.state);
+        if (ct.state === 'value' && mt.state === 'value') {
+          expect([mt.usd, mt.cop, mt.missing, mt.stamp], at).toEqual([
+            ct.usd,
+            ct.cop,
+            ct.missing,
+            { source: ct.source, as_of: ct.as_of, ...(ct.manual ? { manual: true } : {}) },
+          ]);
+        }
+        for (const p of c.spend.providers) {
+          const q = quotaStatus(p.quota, now);
+          if (q.state === 'value')
+            expect(countdownLabel(Date.parse(q.resets_at), now), at).toBe(q.countdown.label);
+        }
+      }
+    }
+  });
+
+  it('accepts and agrees on a snapshot the builder made from every source', async () => {
+    const files: Record<string, unknown> = {
+      'handoff-board.json': handoff,
+      'ai-services.json': aiServices,
+      'cloud-runs.json': cloudRuns,
+      'ai-surfaces-spend.json': spendSheet,
+      'watchman.config.json': { utcOffsetMinutes: -300 },
+    };
+    const gh = fakeGh({
+      viewer: 'sample-owner',
+      accounts: { 'sample-owner': 'User' },
+      repos: [
+        {
+          owner: 'sample-owner',
+          name: 'alpha',
+          openPrs: [
+            {
+              number: 1,
+              title: 'Sample',
+              createdAt: '2026-01-10T15:00:00Z',
+              updatedAt: '2026-01-10T15:00:00Z',
+            },
+          ],
+          mergedPrs: [
+            {
+              number: 2,
+              title: 'Merged',
+              createdAt: '2026-01-09T10:00:00Z',
+              updatedAt: '2026-01-12T10:00:00Z',
+              mergedAt: '2026-01-12T10:00:00Z',
+            },
+          ],
+        },
+      ],
+    });
+    const built = await buildSnapshot({
+      dir: '/synthetic/dir',
+      readText: (path) => {
+        const value = files[path.slice('/synthetic/dir/'.length)];
+        return value === undefined
+          ? Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }))
+          : Promise.resolve(JSON.stringify(value));
+      },
+      runGh: gh.run,
+      now: new Date('2026-01-14T15:00:00Z'),
+    });
+    const json = JSON.parse(JSON.stringify(built.snapshot)) as unknown;
+    const m = mine(json);
+    const c = core(json);
+    expect(m.utc_offset_minutes).toBe(-300);
+    expect(m.sources?.every((s) => s.status === 'value' || s.adapter === 'scorecard')).toBe(true);
+    const now = new Date(m.generated_at);
+    if (c.attention.state !== 'value' || m.attention.state !== 'value')
+      throw new Error('attention');
+    expect(rankAttention(m.attention.candidates, now).map((i) => i.id)).toEqual(
+      coreRank(c.attention.candidates, now).map((i) => i.id),
+    );
+    if (c.flow.state !== 'value' || m.flow.state !== 'value') throw new Error('flow');
+    expect(throughput(m.flow.work_items, now, -300).this_week).toBe(
+      coreThroughput(c.flow.work_items, now, { utcOffsetMinutes: -300 }).this_week,
+    );
+    const page = html(m);
+    for (const id of ['attention', 'flow', 'spend', 'metrics']) {
+      expect(tile(page, id)).not.toContain('data-gaps');
+    }
+    expect(tile(page, 'metrics')).toContain('no scorecard source exists yet');
+    // A merged section names each source once.
+    expect(tile(page, 'flow')).toContain(
+      'tile · <span>github + manual:ai-services.json + manual:cloud-runs.json + manual:handoff-board.json</span>',
+    );
+  });
+
+  // Every value in full.json, removed or replaced by a wrong value: both validators agree.
+  function paths(node: unknown, at: (string | number)[] = []): (string | number)[][] {
+    if (Array.isArray(node)) return [at, ...node.flatMap((child, i) => paths(child, [...at, i]))];
+    if (node !== null && typeof node === 'object') {
+      return [at, ...Object.entries(node).flatMap(([k, child]) => paths(child, [...at, k]))];
+    }
+    return [at];
+  }
+  const replacements: unknown[] = [
+    undefined,
+    null,
+    'x',
+    '',
+    ' ',
+    -1,
+    1.5,
+    1e20,
+    true,
+    [],
+    {},
+    'http://example.com/x',
+  ];
+  function mutate(base: unknown, at: (string | number)[], value: unknown): unknown {
+    const copy = JSON.parse(JSON.stringify(base)) as Record<string | number, unknown>;
+    let node = copy as Record<string | number, unknown>;
+    for (const key of at.slice(0, -1)) node = node[key] as Record<string | number, unknown>;
+    const last = at[at.length - 1]!;
+    if (value === undefined) {
+      if (Array.isArray(node)) node.splice(last as number, 1);
+      else delete node[last];
+    } else node[last] = value;
+    return copy;
+  }
+
+  it('agrees with core on every single-value mutation of the full fixture', () => {
+    const base = FIXTURES['full.json'];
+    const disagreements: string[] = [];
+    let checked = 0;
+    for (const at of paths(base).filter((p) => p.length > 0)) {
+      for (const value of replacements) {
+        const json = mutate(base, at, value);
+        const c = parseSnapshot(json).ok;
+        const m = validateSnapshot(json).ok;
+        checked += 1;
+        if (c !== m)
+          disagreements.push(
+            `${at.join('.')} = ${JSON.stringify(value)}: core ${c}, artifact ${m}`,
+          );
+      }
+    }
+    expect(checked).toBeGreaterThan(3000);
+    expect(disagreements).toEqual([]);
+  });
+
+  it.each([
+    '2026-01-14T15:00Z',
+    '2026-02-30T10:00:00Z',
+    '2026-02-29T10:00:00Z',
+    '2026-04-31T00:00:00Z',
+    '2026-01-14T24:00:00Z',
+    '2026-01-14T15:00:60Z',
+    '2026-13-01T00:00:00Z',
+    '2026-01-14T15:00:00+24:00',
+  ])('refuses the date %s, as core does', (date) => {
+    const json = { ...(FIXTURES['full.json'] as object), generated_at: date };
+    expect(parseSnapshot(json).ok).toBe(false);
+    expect(validateSnapshot(json).ok).toBe(false);
+  });
+
+  it.each(['2028-02-29T10:00:00Z', '2026-01-14T15:00:00.123+05:30', '2026-01-14T15:00:00-05:00'])(
+    'accepts the date %s, as core does',
+    (date) => {
+      const json = { ...(FIXTURES['full.json'] as object), generated_at: date };
+      expect(validateSnapshot(json).ok).toBe(parseSnapshot(json).ok);
+    },
+  );
+
+  it('refuses inherited key names and unsafe integers, as core does', () => {
+    const full = FIXTURES['full.json'] as { flow: { projects: object[] } } & Record<
+      string,
+      unknown
+    >;
+    for (const json of [
+      { ...full, constructor: 1 },
+      { ...full, toString: 'x' },
+      {
+        ...full,
+        flow: { ...full.flow, projects: [{ ...full.flow.projects[0], open_prs: 2 ** 60 }] },
+      },
+    ]) {
+      expect(parseSnapshot(json).ok).toBe(false);
+      expect(validateSnapshot(json).ok).toBe(false);
+    }
+  });
+
+  it('marks a tile partial when a source that feeds it failed', () => {
+    const base = mine(FIXTURES['full.json']);
+    const page = html({
+      ...base,
+      sources: [
+        {
+          adapter: 'github',
+          status: 'failed',
+          feeds: ['attention', 'flow'],
+          reason: 'gh pr list failed (exit 1)',
+        },
+        { adapter: 'handoff-board', status: 'value', feeds: ['attention', 'flow'] },
+        {
+          adapter: 'ai-surfaces-spend',
+          status: 'no_data',
+          feeds: ['spend'],
+          reason: 'ai-surfaces-spend.json is not in the snapshot directory',
+        },
+      ],
+    });
+    for (const id of ['attention', 'flow']) {
+      expect(tile(page, id)).toContain('partial: github failed — gh pr list failed (exit 1)');
+    }
+    expect(tile(page, 'spend')).toContain('missing: ai-surfaces-spend had no data');
+    expect(tile(page, 'metrics')).not.toContain('data-gaps');
+    expect(tile(page, 'flow')).not.toContain('handoff-board');
+  });
+
+  it('counts the week in the owner’s calendar', () => {
+    const base = mine(FIXTURES['full.json']);
+    if (base.flow.state !== 'value') throw new Error('flow');
+    // Sunday 2026-01-18 23:30 UTC is Sunday 18:30 at UTC-5 but Monday 04:30 at UTC+5.
+    const generated = '2026-01-18T23:30:00Z';
+    const item = {
+      ...base.flow.work_items[0]!,
+      completed_at: '2026-01-18T12:00:00Z',
+      updated_at: '2026-01-18T12:00:00Z',
+    };
+    const shaped = (offset: number) =>
+      mine({
+        ...base,
+        generated_at: generated,
+        utc_offset_minutes: offset,
+        flow: { ...base.flow, work_items: [item] },
+      });
+    expect(tile(html(shaped(-300)), 'flow')).toMatch(/data-figure="flow">1</);
+    expect(tile(html(shaped(300)), 'flow')).toMatch(/data-figure="flow">0</);
   });
 });

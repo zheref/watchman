@@ -59,11 +59,21 @@ export type Provider = { id: string; label: string; quota: Quota; monthly_cost: 
 export type MetricSeries = Observed<{ unit?: string; points: { at: string; value: number }[] }>;
 export type ProjectMetrics = { project: string; metrics: Partial<Record<string, MetricSeries>> };
 
+export type SectionKey = 'attention' | 'flow' | 'spend' | 'metrics';
+export type SourceRecord = {
+  adapter: string;
+  status: 'value' | 'no_data' | 'failed';
+  feeds: SectionKey[];
+  reason?: string;
+};
+
 export type Snapshot = {
   $comment?: string;
   schema_version: 1;
   generated_at: string;
   synthetic?: boolean;
+  utc_offset_minutes?: number;
+  sources?: SourceRecord[];
   attention: Observed<{ candidates: Candidate[] }>;
   flow: Observed<{ projects: FlowProject[]; work_items: WorkItem[]; board: Board }>;
   spend: Observed<{ providers: Provider[] }>;
@@ -427,17 +437,41 @@ export const SYNTHETIC_SNAPSHOT: Snapshot = {
 
 export type ParseResult = { ok: true; snapshot: Snapshot } | { ok: false; errors: string[] };
 
-const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
+const ISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/;
 const HOST = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
 const CREDENTIAL_QUERY =
   /[?&](?:token|access_token|id_token|refresh_token|api_key|apikey|key|sig|signature|auth|password|secret)=/i;
-const AS_OF_SKEW_MS = 5 * 60 * 1000;
+export const AS_OF_SKEW_MS = 5 * 60 * 1000;
+export const SECTION_KEYS = ['attention', 'flow', 'spend', 'metrics'] as const;
+export const SOURCE_STATUSES = ['value', 'no_data', 'failed'] as const;
+export const ATTENTION_KINDS = ['owner_decision', 'blocked_card', 'waiting_pr'] as const;
+export const WORK_ITEM_KINDS = ['pr', 'issue', 'card'] as const;
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isLabel = (v: unknown) => typeof v === 'string' && v.trim().length > 0;
-const isIso = (v: unknown) => typeof v === 'string' && ISO.test(v) && !Number.isNaN(Date.parse(v));
-const isInt = (v: unknown) => typeof v === 'number' && Number.isInteger(v);
+/** Seconds required, real calendar dates only (no Feb 30, no hour 24), as core's validator. */
+function isIso(v: unknown): boolean {
+  if (typeof v !== 'string') return false;
+  const m = ISO.exec(v);
+  if (!m) return false;
+  const [year, month, day, hour, minute, second] = m.slice(1, 7).map(Number) as number[];
+  const offH = m[7] === undefined ? 0 : Number(m[7]);
+  const offM = m[8] === undefined ? 0 : Number(m[8]);
+  const days = new Date(Date.UTC(year!, month!, 0)).getUTCDate();
+  return (
+    month! >= 1 &&
+    month! <= 12 &&
+    day! >= 1 &&
+    day! <= days &&
+    hour! <= 23 &&
+    minute! <= 59 &&
+    second! <= 59 &&
+    offH <= 23 &&
+    offM <= 59
+  );
+}
+const isInt = (v: unknown) => typeof v === 'number' && Number.isSafeInteger(v);
 const isNum = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
 
 function isDeepLink(v: unknown): boolean {
@@ -464,7 +498,7 @@ const need =
   };
 const label = need(isLabel, 'expected a non-empty string');
 const title = need(
-  (v) => isLabel(v) && (v as string).length <= 200,
+  (v) => isLabel(v) && (v as string).trim().length <= 200,
   'expected a title of 1–200 characters',
 );
 const iso = need(isIso, 'expected an ISO 8601 date-time with an offset');
@@ -485,7 +519,7 @@ function record(shape: Record<string, Field>): Field {
       return;
     }
     for (const key of Object.keys(value)) {
-      if (!(key in shape)) errors.push(`${path}.${key}: unknown key`);
+      if (!Object.hasOwn(shape, key)) errors.push(`${path}.${key}: unknown key`);
     }
     for (const [key, field] of Object.entries(shape)) field(value[key], `${path}.${key}`, errors);
   };
@@ -531,7 +565,7 @@ function observed(shape: Record<string, Field>): Field {
 
 const candidateField = record({
   id: label,
-  kind: oneOf(['owner_decision', 'blocked_card', 'waiting_pr']),
+  kind: oneOf(ATTENTION_KINDS),
   title,
   project: label,
   url: link,
@@ -547,7 +581,7 @@ const projectField = record({ project: label, open_prs: count, open_issues: coun
 const workItemField = record({
   id: label,
   project: label,
-  kind: oneOf(['pr', 'issue', 'card']),
+  kind: oneOf(WORK_ITEM_KINDS),
   title,
   url: link,
   opened_at: iso,
@@ -592,6 +626,24 @@ const snapshotField = record({
   schema_version: need((v) => v === 1, 'unsupported schema_version; this artifact reads 1'),
   generated_at: iso,
   synthetic: optional(need((v) => typeof v === 'boolean', 'expected true or false')),
+  utc_offset_minutes: optional(
+    need((v) => isInt(v) && Math.abs(v as number) <= 14 * 60, 'expected whole minutes, ±840'),
+  ),
+  sources: optional(
+    list(
+      record({
+        adapter: label,
+        status: oneOf(SOURCE_STATUSES),
+        feeds: list(oneOf(SECTION_KEYS)),
+        reason: optional(
+          need(
+            (v) => isLabel(v) && (v as string).trim().length <= 300,
+            'expected 1–300 characters',
+          ),
+        ),
+      }),
+    ),
+  ),
   attention: observed({ candidates: list(candidateField) }),
   flow: observed({
     projects: list(projectField),
@@ -650,6 +702,8 @@ const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 export const ATTENTION_LIMIT = 5;
+/** A pull request only needs the owner once it has waited longer than this. */
+export const PR_WAIT_THRESHOLD_HOURS = 48;
 export const STALE_AFTER_DAYS = 3;
 /** How many projects the Flow tile lists by name. */
 export const BUSIEST_PROJECTS = 8;
@@ -662,7 +716,7 @@ const KIND_ORDER: Record<AttentionKind, number> = {
 const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 export function combineStamps(records: readonly Stamp[]): Stamp {
-  const sources = [...new Set(records.map((r) => r.source))].sort();
+  const sources = [...new Set(records.flatMap((r) => r.source.split(' + ')))].sort();
   let oldest = records[0]!.as_of;
   for (const r of records) if (ms(r.as_of) < ms(oldest)) oldest = r.as_of;
   const manual = records.some((r) => r.manual === true);
@@ -689,7 +743,8 @@ export function rankAttention(candidates: readonly Candidate[], nowDate: Date): 
   for (const c of candidates) {
     if (seen.has(c.id)) continue;
     seen.add(c.id);
-    if (c.kind === 'waiting_pr' && now - ms(c.waiting_since) <= 48 * HOUR) continue;
+    if (c.kind === 'waiting_pr' && now - ms(c.waiting_since) <= PR_WAIT_THRESHOLD_HOURS * HOUR)
+      continue;
     const urgency = urgencyOf(c, now);
     const waited = Math.floor(Math.max(0, (now - ms(c.waiting_since)) / HOUR));
     ranked.push({ ...c, urgency, score: c.value * urgency, waited_hours: waited });
@@ -705,15 +760,18 @@ export function rankAttention(candidates: readonly Candidate[], nowDate: Date): 
   return ranked.slice(0, ATTENTION_LIMIT);
 }
 
-/** Start of this week and last (Monday, UTC). */
-function weekStarts(now: Date): [number, number] {
-  const since = (now.getUTCDay() - 1 + 7) % 7;
-  const start = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - since);
+/** Start of this week and last: Monday midnight in the owner's calendar (UTC + offset). */
+function weekStarts(now: Date, offsetMinutes: number): [number, number] {
+  const offset = offsetMinutes * MINUTE;
+  const local = new Date(now.getTime() + offset);
+  const since = (local.getUTCDay() - 1 + 7) % 7;
+  const start =
+    Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - since) - offset;
   return [start, start - 7 * DAY];
 }
 
-export function throughput(items: readonly WorkItem[], now: Date) {
-  const [thisStart, lastStart] = weekStarts(now);
+export function throughput(items: readonly WorkItem[], now: Date, offsetMinutes = 0) {
+  const [thisStart, lastStart] = weekStarts(now, offsetMinutes);
   let thisWeek = 0;
   let lastWeek = 0;
   for (const item of items) {
@@ -750,8 +808,11 @@ export function countdownLabel(target: number, now: Date): string {
   return total > 0 ? '<1m' : 'now';
 }
 
-export const monthOf = (now: Date) =>
-  `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+/** `YYYY-MM` of `now` in the owner's calendar. */
+export function monthOf(now: Date, offsetMinutes = 0): string {
+  const local = new Date(now.getTime() + offsetMinutes * MINUTE);
+  return `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, '0')}`;
+}
 
 export type MonthlyTotal =
   | { state: 'value'; usd: number; cop: number; missing: string[]; stamp: Stamp }
@@ -799,6 +860,18 @@ function describeAge(iso: string, now: Date): string {
   if (age < HOUR) return `${Math.floor(age / MINUTE)}m ago`;
   if (age < DAY) return `${Math.floor(age / HOUR)}h ago`;
   return `${Math.floor(age / DAY)}d ago`;
+}
+
+/** The sources that feed `section` but failed or had no data, as the builder recorded them. */
+export function gapsFor(snapshot: Snapshot, section: SectionKey): SourceRecord[] {
+  const record = snapshot[section];
+  return (snapshot.sources ?? []).filter(
+    (s) =>
+      s.status !== 'value' &&
+      s.feeds.includes(section) &&
+      // A "no data" tile already shows its reason; do not repeat it as a gap.
+      !(record.state === 'no_data' && s.reason === record.reason),
+  );
 }
 
 const waited = (hours: number) => (hours < 48 ? `${hours}h` : `${Math.floor(hours / 24)}d`);
@@ -923,6 +996,7 @@ function Tile({
   missing,
   stamp,
   synthetic,
+  gaps,
   children,
 }: {
   id: string;
@@ -931,6 +1005,8 @@ function Tile({
   missing: boolean;
   stamp: Stamp;
   synthetic: boolean;
+  /** Sources that feed this tile but failed or had no data. */
+  gaps: SourceRecord[];
   children: ReactNode;
 }) {
   return (
@@ -959,6 +1035,17 @@ function Tile({
         }}
       >
         <StampLine stamp={stamp} prefix="tile" />
+        {gaps.length > 0 ? (
+          <ul style={{ ...styles.list, marginTop: '0.25rem' }} data-gaps="">
+            {gaps.map((g) => (
+              <li key={g.adapter} style={styles.caption}>
+                {g.status === 'failed' ? 'partial: ' : 'missing: '}
+                {g.adapter} {g.status === 'failed' ? 'failed' : 'had no data'}
+                {g.reason ? ` — ${g.reason}` : ''}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
     </section>
   );
@@ -982,6 +1069,7 @@ function AttentionTile({ snapshot, now }: { snapshot: Snapshot; now: Date }) {
         missing
         stamp={section}
         synthetic={synthetic}
+        gaps={gapsFor(snapshot, 'attention')}
       >
         <NoDataBlock record={section} />
       </Tile>
@@ -997,6 +1085,7 @@ function AttentionTile({ snapshot, now }: { snapshot: Snapshot; now: Date }) {
       missing={false}
       stamp={stamp}
       synthetic={synthetic}
+      gaps={gapsFor(snapshot, 'attention')}
     >
       <div style={styles.figure} data-figure="attention">
         {items.length}
@@ -1029,12 +1118,20 @@ function FlowTile({ snapshot, now }: { snapshot: Snapshot; now: Date }) {
   const synthetic = snapshot.synthetic === true;
   if (section.state === 'no_data') {
     return (
-      <Tile id="flow" name="Flow" color={METRO.flow} missing stamp={section} synthetic={synthetic}>
+      <Tile
+        id="flow"
+        name="Flow"
+        color={METRO.flow}
+        missing
+        stamp={section}
+        synthetic={synthetic}
+        gaps={gapsFor(snapshot, 'flow')}
+      >
         <NoDataBlock record={section} />
       </Tile>
     );
   }
-  const t = throughput(section.work_items, now);
+  const t = throughput(section.work_items, now, snapshot.utc_offset_minutes ?? 0);
   const stale = staleCount(section.work_items, now);
   const openPrs = section.projects.reduce((n, p) => n + p.open_prs, 0);
   const openIssues = section.projects.reduce((n, p) => n + p.open_issues, 0);
@@ -1057,6 +1154,7 @@ function FlowTile({ snapshot, now }: { snapshot: Snapshot; now: Date }) {
       missing={false}
       stamp={stamp}
       synthetic={synthetic}
+      gaps={gapsFor(snapshot, 'flow')}
     >
       <div style={styles.figure} data-figure="flow">
         {t.this_week}
@@ -1076,9 +1174,9 @@ function FlowTile({ snapshot, now }: { snapshot: Snapshot; now: Date }) {
       ) : (
         <>
           <ul style={styles.list}>
-            {section.board.columns.map((c) => (
+            {section.board.columns.map((c, i) => (
               <li
-                key={c.name}
+                key={`${i}-${c.name}`}
                 style={{ ...styles.row, display: 'flex', justifyContent: 'space-between' }}
               >
                 <span>{c.name}</span>
@@ -1123,12 +1221,13 @@ function SpendTile({ snapshot, now }: { snapshot: Snapshot; now: Date }) {
         missing
         stamp={section}
         synthetic={synthetic}
+        gaps={gapsFor(snapshot, 'spend')}
       >
         <NoDataBlock record={section} />
       </Tile>
     );
   }
-  const month = monthOf(now);
+  const month = monthOf(now, snapshot.utc_offset_minutes ?? 0);
   const total = monthlyTotal(section.providers, month);
   const quotas = section.providers.map((p) => p.quota);
   const stamp = combineStamps([
@@ -1144,6 +1243,7 @@ function SpendTile({ snapshot, now }: { snapshot: Snapshot; now: Date }) {
       missing={false}
       stamp={stamp}
       synthetic={synthetic}
+      gaps={gapsFor(snapshot, 'spend')}
     >
       {total.state === 'value' ? (
         <>
@@ -1241,6 +1341,7 @@ function MetricsTile({ snapshot }: { snapshot: Snapshot }) {
         missing
         stamp={section}
         synthetic={synthetic}
+        gaps={gapsFor(snapshot, 'metrics')}
       >
         <NoDataBlock record={section} />
       </Tile>
@@ -1254,6 +1355,7 @@ function MetricsTile({ snapshot }: { snapshot: Snapshot }) {
       missing={false}
       stamp={section}
       synthetic={synthetic}
+      gaps={gapsFor(snapshot, 'metrics')}
     >
       {section.projects.length === 0 ? (
         <NoDataBlock
@@ -1373,8 +1475,8 @@ function LoadPanel({ onLoad, onReset }: { onLoad: (s: Snapshot) => void; onReset
         >
           <strong>This snapshot was not loaded.</strong> {errors.length} problem(s):
           <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem' }}>
-            {errors.slice(0, 8).map((e) => (
-              <li key={e}>{e}</li>
+            {errors.slice(0, 8).map((e, i) => (
+              <li key={`${i}-${e}`}>{e}</li>
             ))}
           </ul>
           {errors.length > 8 ? <div>and {errors.length - 8} more</div> : null}

@@ -94,38 +94,40 @@ describe('buildSnapshot', () => {
     for (const key of ['attention', 'flow', 'spend', 'metrics'] as const) {
       expect(built.snapshot[key].state).toBe('no_data');
     }
-    expect(built.sources).toEqual([
+    // The same outcomes are written into the snapshot itself, for the artifact to show.
+    expect(built.snapshot.sources).toEqual([
       {
         adapter: 'handoff-board',
         status: 'no_data',
-        sections: [],
+        feeds: ['attention', 'flow'],
         reason: 'handoff-board.json is not in the snapshot directory',
       },
       {
         adapter: 'ai-services',
         status: 'no_data',
-        sections: [],
+        feeds: ['attention', 'flow'],
         reason: 'ai-services.json is not in the snapshot directory',
       },
       {
         adapter: 'cloud-runs',
         status: 'no_data',
-        sections: [],
+        feeds: ['attention', 'flow'],
         reason: 'cloud-runs.json is not in the snapshot directory',
       },
       {
         adapter: 'ai-surfaces-spend',
         status: 'no_data',
-        sections: [],
+        feeds: ['spend'],
         reason: 'ai-surfaces-spend.json is not in the snapshot directory',
       },
       {
         adapter: 'scorecard',
         status: 'no_data',
-        sections: [],
+        feeds: ['metrics'],
         reason: 'no scorecard source exists yet',
       },
     ]);
+    expect(built.snapshot.utc_offset_minutes).toBeUndefined();
   });
 
   it('lists a failing source and keeps the others', async () => {
@@ -143,6 +145,94 @@ describe('buildSnapshot', () => {
     });
     expect(built.snapshot.spend.state).toBe('value');
     expect(built.snapshot.flow).toMatchObject({ state: 'no_data' });
+  });
+
+  it('writes a failed source into the snapshot, so a merged section reads as partial', async () => {
+    const fs = memoryDir(DIR, {
+      'handoff-board.json': handoff,
+      [CONFIG_FILE]: { utcOffsetMinutes: -300 },
+    });
+    const built = await buildSnapshot({
+      ...fs,
+      runGh: () => Promise.reject(new Error('gh pr list failed (exit 1)')),
+      now: NOW,
+    });
+    expect(built.snapshot.flow.state).toBe('value');
+    expect(built.snapshot.sources?.[0]).toEqual({
+      adapter: 'github',
+      status: 'failed',
+      feeds: ['attention', 'flow'],
+      reason: 'gh pr list failed (exit 1)',
+    });
+    expect(built.snapshot.utc_offset_minutes).toBe(-300);
+    expect(parseSnapshot(JSON.parse(JSON.stringify(built.snapshot))).ok).toBe(true);
+  });
+
+  it('gives a missing board the handoff board’s own reason, not a placeholder', async () => {
+    const built = await buildSnapshot({
+      ...memoryDir(DIR, { 'ai-services.json': aiServices }),
+      runGh: fakeGh(WORLD).run,
+      now: NOW,
+    });
+    if (built.snapshot.flow.state !== 'value') throw new Error('expected flow');
+    expect(built.snapshot.flow.board).toEqual({
+      state: 'no_data',
+      reason: 'handoff-board.json is not in the snapshot directory',
+      source: 'handoff-board',
+      as_of: NOW.toISOString(),
+    });
+    const failed = await buildSnapshot({
+      dir: DIR,
+      readText: (path) =>
+        path.endsWith('handoff-board.json')
+          ? Promise.reject(Object.assign(new Error('denied'), { code: 'EACCES' }))
+          : memoryDir(DIR, { 'ai-services.json': aiServices }).readText(path),
+      now: NOW,
+    });
+    if (failed.snapshot.flow.state !== 'value') throw new Error('expected flow');
+    expect(failed.snapshot.flow.board).toMatchObject({
+      reason: 'the handoff board failed: manual:handoff-board.json: could not be read (EACCES)',
+    });
+  });
+
+  it('drops excluded material from every export, however it is spelt', async () => {
+    const card = handoff.cards[0]!;
+    const fs = memoryDir(DIR, {
+      'handoff-board.json': {
+        ...handoff,
+        cards: [
+          ...handoff.cards,
+          { ...card, id: 'nda-1', project: 'Global Logic port' },
+          { ...card, id: 'nda-2', title: 'Notes on IN\u200bSULET' },
+        ],
+      },
+      'ai-services.json': {
+        ...aiServices,
+        items: [
+          ...aiServices.items,
+          { ...aiServices.items[0]!, id: 'nda-3', url: 'https://example.com/global_logic/x' },
+        ],
+      },
+      'ai-surfaces-spend.json': {
+        ...spendSheet,
+        providers: [...spendSheet.providers, { id: 'nda-4', label: 'GLOBAL-LOGIC seat' }],
+      },
+    });
+    const built = await buildSnapshot({ ...fs, now: NOW });
+    const text = JSON.stringify(built.snapshot);
+    expect(text).not.toMatch(/nda-\d/);
+    expect(built.dropped).toBeGreaterThanOrEqual(6);
+    expect(parseSnapshot(JSON.parse(text)).ok).toBe(true);
+  });
+
+  it('withholds a failure reason or a label that mentions excluded material', async () => {
+    const built = await buildSnapshot({
+      ...memoryDir(DIR, { 'ai-surfaces-spend.json': { ...spendSheet, source: 'insulet sheet' } }),
+      runGh: () => Promise.reject(new Error('could not read insulet-tools')),
+      now: NOW,
+    });
+    expect(built.snapshot.sources?.[0]?.reason).toBe('withheld: it mentions excluded material');
+    expect(JSON.stringify(built.snapshot)).not.toMatch(/insulet/i);
   });
 
   it('skips GitHub when the config disables it', async () => {
@@ -231,6 +321,7 @@ describe('describeSnapshotShape', () => {
       },
       failures: [],
       sources: [],
+      dropped: 0,
     });
     expect(lines).toEqual([
       'attention: no_data',

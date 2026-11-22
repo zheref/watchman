@@ -15,7 +15,15 @@ import {
   type PartialSnapshot,
   type SourceAdapter,
 } from './adapters/source';
-import { SECTION_KEYS, type SectionKey, type Snapshot } from './snapshot';
+import { dropExcluded, isAlwaysExcluded } from './adapters/exclusions';
+import { noData } from './provenance';
+import {
+  SECTION_KEYS,
+  assertSnapshot,
+  type SectionKey,
+  type Snapshot,
+  type SourceStatusRecord,
+} from './snapshot';
 
 /**
  * Builds a real snapshot from every configured source. Pure orchestration: the caller (the
@@ -28,6 +36,8 @@ export const CONFIG_FILE = 'watchman.config.json';
 
 export const snapshotConfigSchema = z.strictObject({
   $comment: z.string().optional(),
+  /** `true` on the committed example only. */
+  synthetic: z.boolean().optional(),
   github: z
     .strictObject({
       /** Set to false to skip GitHub entirely. */
@@ -122,6 +132,8 @@ export interface SourceStatus {
   status: 'value' | 'no_data' | 'failed';
   /** Sections it reported with a value. */
   sections: SectionKey[];
+  /** Sections it reports when it works (its declared feeds). */
+  feeds: SectionKey[];
   /** Why it has no data, or why it failed. */
   reason?: string;
 }
@@ -130,9 +142,11 @@ export interface BuiltSnapshot {
   snapshot: Snapshot;
   failures: AdapterFailure[];
   sources: SourceStatus[];
+  /** Records removed because they mention excluded material. */
+  dropped: number;
 }
 
-function statusOf(adapter: string, report: PartialSnapshot): SourceStatus {
+function statusOf(adapter: string, report: PartialSnapshot): Omit<SourceStatus, 'feeds'> {
   const sections = SECTION_KEYS.filter((key) => report.sections[key]?.state === 'value');
   if (sections.length > 0) return { adapter, status: 'value', sections };
   const reason = SECTION_KEYS.map((key) => report.sections[key])
@@ -147,20 +161,78 @@ export async function buildSnapshot(options: BuildSnapshotOptions): Promise<Buil
   const reports = new Map<string, PartialSnapshot>();
   const adapters = snapshotAdapters(config, options).map((adapter): SourceAdapter => ({
     id: adapter.id,
+    feeds: adapter.feeds ?? [],
     async fetch(context) {
       const report = await adapter.fetch(context);
       reports.set(adapter.id, report);
       return report;
     },
   }));
-  const { snapshot, failures } = await collectSnapshot(adapters, { now: options.now });
+  const { snapshot: merged, failures } = await collectSnapshot(adapters, { now: options.now });
   const sources = adapters.map((adapter): SourceStatus => {
+    const feeds = [...(adapter.feeds ?? [])];
     const failure = failures.find((f) => f.adapter === adapter.id);
-    if (failure)
-      return { adapter: adapter.id, status: 'failed', sections: [], reason: failure.message };
-    return statusOf(adapter.id, reports.get(adapter.id)!);
+    if (failure) {
+      return {
+        adapter: adapter.id,
+        status: 'failed',
+        sections: [],
+        feeds,
+        reason: failure.message,
+      };
+    }
+    return { ...statusOf(adapter.id, reports.get(adapter.id)!), feeds };
   });
-  return { snapshot, failures, sources };
+
+  // The board is the handoff board's alone: when no board has a value, say why that source has
+  // none, rather than another adapter's placeholder.
+  let snapshot = merged;
+  const flow = snapshot.flow;
+  const handoff = sources.find((s) => s.adapter === 'handoff-board');
+  if (
+    flow.state === 'value' &&
+    flow.board.state === 'no_data' &&
+    handoff &&
+    handoff.status !== 'value'
+  ) {
+    const reason =
+      handoff.status === 'failed'
+        ? `the handoff board failed: ${handoff.reason ?? 'unknown error'}`
+        : (handoff.reason ?? 'the handoff board reported no board');
+    snapshot = {
+      ...snapshot,
+      flow: { ...flow, board: noData(reason, 'handoff-board', snapshot.generated_at) },
+    };
+  }
+
+  const { snapshot: scrubbed, dropped } = dropExcluded(snapshot);
+  const final = assertSnapshot(
+    {
+      ...scrubbed,
+      ...(config.utcOffsetMinutes === undefined
+        ? {}
+        : { utc_offset_minutes: config.utcOffsetMinutes }),
+      sources: sources.map(toRecord),
+    },
+    'built snapshot',
+  );
+  return { snapshot: final, failures, sources, dropped };
+}
+
+/** The record written into the snapshot: a long or excluded reason is cut or withheld. */
+function toRecord(source: SourceStatus): SourceStatusRecord {
+  const reason =
+    source.reason === undefined
+      ? undefined
+      : isAlwaysExcluded(source.reason)
+        ? 'withheld: it mentions excluded material'
+        : source.reason.trim().slice(0, 300) || undefined;
+  return {
+    adapter: source.adapter,
+    status: source.status,
+    feeds: source.feeds,
+    ...(reason === undefined ? {} : { reason }),
+  };
 }
 
 /** `snapshot-2026-11-22T19-07-28Z.json`: the ISO instant, with `:` and milliseconds removed. */
