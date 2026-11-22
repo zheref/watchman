@@ -29,9 +29,11 @@ export default defineConfig({
         // The root layout is the composition root: it loads next/font, which only runs inside a
         // Next build. It is proved by `next build` and the /theme screenshots (UZF-19 exemption).
         'apps/web/src/app/layout.tsx',
-        // The mobile screen, its route layout and its tile component are React Native views with
-        // no logic of their own (the view-model carries it, and is measured). They need the native
-        // runtime, so they are proved by `expo export` bundling them for iOS and Android (UZF-19).
+        // The mobile screen, route layout and tile component are React Native views: they need the
+        // native runtime, which Vitest's plain-Node project cannot load. The logic they used to
+        // hold is in src/lib (view-model, link opener) and is measured; what stays is layout and
+        // wiring, proved by `expo export` bundling them for iOS and Android (UZF-19), with the
+        // device checks tracked in the PR.
         'apps/mobile/src/app/**',
         'apps/mobile/src/components/**',
         'apps/mobile/src/theme.ts',

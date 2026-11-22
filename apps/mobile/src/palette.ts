@@ -12,8 +12,11 @@ export const COLORS = {
   noData: '#333333',
   fg: '#FFFFFF',
   fgMuted: '#B8B8B8',
-  /** Hairlines on a tile: a white at 40%, over cobalt. Decoration only; no text uses it. */
-  rule: 'rgba(255, 255, 255, 0.4)',
+  /** Hairlines on a tile: a white at 60% (3.1:1 over cobalt). Decoration only; no text uses it. */
+  rule: 'rgba(255, 255, 255, 0.6)',
+  /** A pressed row: the tile darkened, which only raises the white text's contrast. */
+  pressed: 'rgba(0, 0, 0, 0.2)',
+  /** The keyboard-focus outline on a row (white on cobalt is 6.2:1, over the 3:1 non-text bar). */
   focus: '#FFFFFF',
 } as const;
 

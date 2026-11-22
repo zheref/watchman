@@ -17,6 +17,14 @@ describe('the Metro palette keeps WCAG AA contrast for text', () => {
     expect(contrastRatio(COLORS.fgMuted, COLORS.canvas)).toBeGreaterThanOrEqual(AA_NORMAL);
   });
 
+  it('the focus outline and the hairline rules clear the 3:1 non-text bar on the tile', () => {
+    expect(contrastRatio(COLORS.focus, COLORS.cobalt)).toBeGreaterThanOrEqual(3);
+    // The rule is white at 60% over cobalt: blend it the way the screen does.
+    const blend = (c: number) => Math.round(0.6 * 255 + 0.4 * c);
+    const hex = [0x00, 0x50, 0xef].map((c) => blend(c).toString(16).padStart(2, '0')).join('');
+    expect(contrastRatio(`#${hex}`, COLORS.cobalt)).toBeGreaterThanOrEqual(3);
+  });
+
   it('contrast is symmetric and 1 for equal colours', () => {
     expect(contrastRatio('#000000', '#FFFFFF')).toBeCloseTo(21, 5);
     expect(contrastRatio('#FFFFFF', '#000000')).toBeCloseTo(21, 5);

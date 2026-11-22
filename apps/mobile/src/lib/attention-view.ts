@@ -87,7 +87,7 @@ export type AttentionTileView =
       items: AttentionItemView[];
       /** One short line under the headline figure. */
       caption: string;
-      /** Every source behind the shown items, the oldest as-of, manual if any part is. */
+      /** Every source behind the waiting items, the oldest as-of, manual if any part is. */
       stamp: StampView;
       synthetic: boolean;
     };
@@ -147,7 +147,8 @@ export function attentionTile(
     waiting: eligible.length,
     items,
     caption: captionFor(eligible.length, items.length),
-    stamp: stampOf(combineProvenance([section, ...ranked])),
+    // The headline counts everyone waiting, so the stamp covers everyone waiting, shown or not.
+    stamp: stampOf(combineProvenance([section, ...eligible])),
     synthetic,
   };
 }

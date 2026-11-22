@@ -347,14 +347,21 @@ It shows, from the committed **synthetic** fixture (`packages/core/fixtures/synt
   opens; tapping a row calls `Linking.openURL` with the item's deep link (a link that cannot be
   opened shows "Could not open that link", never a silent failure);
 - a **synthetic** badge on the tile (and a **manual** one when a person typed the figures in), and
-  one footer line stamping the tile with every source behind it and the oldest as-of;
+  one footer line stamping the tile with every source behind everything waiting and the oldest as-of;
 - a labelled **"No data"** state, in neutral grey with the reason, when the Attention section has no
   data or the snapshot fails core's validation. It never shows a zero or an invented item.
 
 The look matches the web theme in plain React Native styles: a dark canvas, a flat cobalt tile,
-square corners, a big light figure and a pivot-style header. The tile is a labelled `region` with a
-heading, a list of links with whole-sentence accessibility labels, 48dp touch targets and text that
-scales with the system text size; white on cobalt is 6.2:1 (a test keeps every text colour at AA).
+square corners, a big light figure and a pivot-style header. Each row is a link with a
+whole-sentence accessibility label (title, why it waits, project, wait, source and as-of) and a
+hint naming the host it opens, a 48dp touch target and a visible focus outline for keyboards; the
+tile and its list carry `region` and `list` roles, which Android may use and iOS ignores, so
+nothing depends on them. Body text follows the system text size (the big figures are capped at
+1.2x), and the content keeps a 640dp column on tablets. White on cobalt is 6.2:1; a test keeps every
+text colour at WCAG AA. It was run in the iOS simulator through Expo Go (screenshot in
+[`docs/evidence/p3-mobile`](docs/evidence/p3-mobile/README.md)); not yet checked: Android,
+VoiceOver and TalkBack traversal, the largest text sizes at 320dp, and the focus outline on an Android
+hardware keyboard.
 
 Ranking, validation and provenance are not reimplemented: the app imports `parseSnapshot`,
 `rankAttention` and `combineProvenance` from `@watchman/core` through the npm workspace, and
@@ -376,7 +383,11 @@ npx expo-doctor             # from apps/mobile: dependency and config diagnosis
 
 Expo Go needs no native build; open the Expo Go app on a phone on the same network and scan the
 QR code the dev server prints, or press `i` / `a` in that terminal to open a simulator you have
-installed. `ios/` and `android/` are generated on demand and git-ignored.
+installed. `ios/` and `android/` are generated on demand and git-ignored. The first `expo run:ios` or
+`run:android` generates them and asks for an iOS bundle identifier or an Android package name, which
+this repository deliberately does not declare (they identify the owner's app); answer the prompt, or
+set `ios.bundleIdentifier` and `android.package` in `apps/mobile/app.json` locally, without committing
+them.
 
 ## Getting started
 

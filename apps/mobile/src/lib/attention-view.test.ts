@@ -94,20 +94,41 @@ describe('overflow: more than five waiting', () => {
     expect(view.waiting).toBeGreaterThan(ATTENTION_LIMIT);
     expect(view.caption).toBe(`items need your yes · the ${ATTENTION_LIMIT} most urgent below`);
   });
+
+  it('stamps the tile with every waiting item, not just the shown five', () => {
+    if (view.state !== 'value') throw new Error('expected a value');
+    const snapshot = snapshotOf(overflow);
+    if (snapshot.attention.state !== 'value') throw new Error('fixture has attention');
+    const all = rankAttention(snapshot.attention.candidates, new Date(snapshot.generated_at), {
+      limit: snapshot.attention.candidates.length,
+    });
+    const sources = new Set(all.flatMap((i) => i.source.split(' + ')));
+    for (const source of sources) expect(view.stamp.source).toContain(source);
+    const oldest = all.map((i) => Date.parse(i.as_of)).reduce((a, b) => Math.min(a, b));
+    expect(Date.parse(view.stamp.asOf)).toBeLessThanOrEqual(oldest);
+  });
 });
 
 describe('labelled states', () => {
-  it('an attention section with no data is a "no data" tile with its reason and stamp', () => {
+  it('the empty fixture is a labelled "no data" tile with its reason and stamp', () => {
     const view = attentionTile(snapshotOf(empty));
-    if (view.state === 'value') {
-      // `empty.json` may carry a value section with no candidates; both must read as labelled.
-      expect(view.waiting).toBe(0);
-      expect(view.items).toEqual([]);
-      expect(view.caption).toBe('nothing needs your yes');
-    } else {
-      expect(view.reason).not.toBe('');
-      expect(view.stamp?.source).not.toBe('');
-    }
+    expect(view.state).toBe('no_data');
+    if (view.state !== 'no_data') throw new Error('expected no_data');
+    expect(view.reason).not.toBe('');
+    expect(view.stamp?.source).not.toBe('');
+  });
+
+  it('a value section with nobody waiting says so, with a zero that is a real count', () => {
+    const input = {
+      ...(full as SnapshotInput),
+      attention: { ...(full.attention as object), candidates: [] },
+    };
+    const view = attentionTile(snapshotOf(input));
+    if (view.state !== 'value') throw new Error('expected a value');
+    expect(view.waiting).toBe(0);
+    expect(view.items).toEqual([]);
+    expect(view.caption).toBe('nothing needs your yes');
+    expect(view.stamp.source).toBe('synthetic');
   });
 
   it('builds a no-data view from a no_data section, never a zero', () => {
