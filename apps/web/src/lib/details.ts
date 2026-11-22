@@ -3,7 +3,7 @@ import {
   combineProvenance,
   compareText,
   formatMoney,
-  isEligible,
+  countNotYetEligible,
   metricCells,
   metricTrend,
   monthOf,
@@ -42,8 +42,8 @@ const stampOf = (r: { source: string; as_of: string; manual?: boolean }): Stamp 
 /** Plain words for why an item waits on the owner. */
 export const KIND_LABEL: Record<AttentionKind, string> = {
   owner_decision: 'Needs your decision',
-  blocked_card: 'Blocked card',
-  waiting_pr: 'Pull request waiting over 48h',
+  blocked_card: 'Blocked',
+  waiting_pr: 'Review waiting over 2 days',
 };
 
 /** `30h` under two days, `3d` from there. */
@@ -71,17 +71,10 @@ export function attentionDetail(snapshot: Snapshot, now: Date): AttentionDetail 
   const section = snapshot.attention;
   if (section.state === 'no_data') return missing(section);
   const items = rankAttention(section.candidates, now, { limit: section.candidates.length });
-  const seen = new Set<string>();
-  let notYetDue = 0;
-  for (const c of section.candidates) {
-    if (seen.has(c.id)) continue;
-    seen.add(c.id);
-    if (!isEligible(c, now)) notYetDue += 1;
-  }
   return {
     state: 'value',
     items,
-    not_yet_due: notYetDue,
+    not_yet_due: countNotYetEligible(section.candidates, now),
     stamp: combineProvenance([section, ...items]),
   };
 }
@@ -237,7 +230,8 @@ export function metricsDetail(snapshot: Snapshot): MetricsDetail {
       const cells = metricCells(section, p.project).map((cell): MetricCellView => {
         const trend = metricTrend(cell.series);
         if (cell.series.state === 'no_data' || !('latest' in trend)) {
-          return { name: cell.name, trend: { state: 'no_data', reason: 'not reported' } };
+          const reason = cell.series.state === 'no_data' ? cell.series.reason : 'not reported';
+          return { name: cell.name, trend: { state: 'no_data', reason } };
         }
         const delta = trend.delta;
         return {
@@ -258,5 +252,9 @@ export function metricsDetail(snapshot: Snapshot): MetricsDetail {
         cells,
       };
     });
-  return { state: 'value', projects, stamp: stampOf(section) };
+  // The stamp covers every reported series, so an older or hand-typed one shows through.
+  const reported = section.projects.flatMap((p) =>
+    Object.values(p.metrics).filter((m) => m !== undefined && m.state === 'value'),
+  );
+  return { state: 'value', projects, stamp: combineProvenance([section, ...reported]) };
 }

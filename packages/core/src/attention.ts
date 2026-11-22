@@ -60,6 +60,21 @@ export function isEligible(candidate: AttentionCandidate, now: Date): boolean {
   return now.getTime() - toMillis(candidate.waiting_since) > PR_WAIT_THRESHOLD_HOURS * HOUR_MS;
 }
 
+/**
+ * How many distinct candidates (first report of an id wins, as in {@link rankAttention}) are not
+ * yet eligible at `now`: pull requests that have not waited {@link PR_WAIT_THRESHOLD_HOURS} yet.
+ */
+export function countNotYetEligible(candidates: readonly AttentionCandidate[], now: Date): number {
+  const seen = new Set<string>();
+  let count = 0;
+  for (const candidate of candidates) {
+    if (seen.has(candidate.id)) continue;
+    seen.add(candidate.id);
+    if (!isEligible(candidate, now)) count += 1;
+  }
+  return count;
+}
+
 export interface RankOptions {
   /** How many to keep; {@link ATTENTION_LIMIT} by default. */
   limit?: number;

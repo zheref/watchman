@@ -121,6 +121,34 @@ describe('metricsDetail', () => {
     expect(project.cells.filter((c) => c.trend.state === 'no_data')).toHaveLength(15);
   });
 
+  it('stamps the view with its oldest and most manual reported series', () => {
+    const base = assertSnapshot(sparse);
+    if (base.metrics.state !== 'value') throw new Error('fixture');
+    const snapshot: Snapshot = {
+      ...base,
+      metrics: {
+        ...base.metrics,
+        projects: [
+          {
+            project: 'Old',
+            metrics: {
+              Cost: {
+                state: 'value',
+                source: 'hand-typed',
+                as_of: '2026-01-02T00:00:00Z',
+                manual: true,
+                points: [{ at: '2026-01-02T00:00:00Z', value: 1 }],
+              },
+            },
+          },
+        ],
+      },
+    };
+    expect(metricsDetail(snapshot)).toMatchObject({
+      stamp: { as_of: '2026-01-02T00:00:00Z', manual: true },
+    });
+  });
+
   it('names the direction of a trend', () => {
     const base = assertSnapshot(sparse);
     if (base.metrics.state !== 'value') throw new Error('fixture');

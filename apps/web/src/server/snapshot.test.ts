@@ -3,12 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import full from '@watchman/core/fixtures/synthetic/full.json';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  FIXTURE_SOURCE,
-  readDashboardData,
-  unavailableSnapshot,
-  type SnapshotFiles,
-} from './snapshot';
+import type { SnapshotDirReader } from '@watchman/core';
+import { FIXTURE_SOURCE, readDashboardData, unavailableSnapshot } from './snapshot';
 
 const NOW = new Date('2026-11-22T20:00:00Z');
 let dir: string;
@@ -26,9 +22,9 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-const memory = (files: Record<string, string>, listError?: Error): SnapshotFiles => ({
+const memory = (files: Record<string, string>, listError?: Error): SnapshotDirReader => ({
   list: () => (listError ? Promise.reject(listError) : Promise.resolve(Object.keys(files))),
-  readText: (path) => {
+  readText: (path: string) => {
     const name = path.split('/').pop()!;
     const text = files[name];
     return text === undefined
@@ -68,39 +64,42 @@ describe('readDashboardData', () => {
   });
 
   it('shows every tile as no data, with a path-free reason, when nothing can be shown', async () => {
-    const cases: [SnapshotFiles, RegExp][] = [
+    const cases: [SnapshotDirReader, RegExp][] = [
       [
         memory({}, Object.assign(new Error('EACCES /secret/dir'), { code: 'EACCES' })),
         /listed \(EACCES\)/,
       ],
-      [memory({}, new Error('odd')), /could not be listed$/],
-      [memory({ 'notes.txt': '' }), /no snapshot-\*\.json/],
+      [memory({ 'notes.txt': '' }), /no snapshot-\*\.json or snapshot\.json/],
       [memory({ 'snapshot.json': '{"broken": ' }), /not valid JSON/],
-      [memory({ 'snapshot.json': '{"schema_version": 1}' }), /invalid file:snapshot\.json/],
+      [
+        memory({ 'snapshot.json': '{"schema_version": 1, "secret": "x"}' }),
+        /file:snapshot\.json: not a valid snapshot \(\d+ problems at /,
+      ],
     ];
     for (const [files, problem] of cases) {
       const data = await readDashboardData({ WATCHMAN_SNAPSHOT_DIR: '/secret/dir' }, NOW, files);
       expect(data.origin).toBe('unavailable');
       expect(data.problem).toMatch(problem);
-      expect(JSON.stringify(data)).not.toContain('/secret/dir');
+      expect(JSON.stringify(data)).not.toMatch(/\/secret\/dir|"x"/);
       expect(data.snapshot.attention).toMatchObject({ state: 'no_data', reason: data.problem });
       expect(data.snapshot.synthetic).toBeUndefined();
     }
   });
 
-  it('names a file it listed but could not read, with the code only', async () => {
-    const files: SnapshotFiles = {
-      list: () => Promise.resolve(['snapshot-2026-01-14T15-00-00Z.json']),
-      readText: () => Promise.reject(Object.assign(new Error('EISDIR /x'), { code: 'EISDIR' })),
-    };
-    const data = await readDashboardData({ WATCHMAN_SNAPSHOT_DIR: '/x' }, NOW, files);
-    expect(data.problem).toBe(
-      'file:snapshot-2026-01-14T15-00-00Z.json: could not be read (EISDIR)',
+  it('shows an older snapshot when the newest is unusable, and says so', async () => {
+    const data = await readDashboardData(
+      { WATCHMAN_SNAPSHOT_DIR: '/x' },
+      NOW,
+      memory({
+        'snapshot-2026-01-14T16-00-00Z.json': '{"half": ',
+        'snapshot-2026-01-14T15-00-00Z.json': JSON.stringify(full),
+      }),
     );
-    const noCode: SnapshotFiles = { ...files, readText: () => Promise.reject(new Error('boom')) };
-    expect((await readDashboardData({ WATCHMAN_SNAPSHOT_DIR: '/x' }, NOW, noCode)).problem).toBe(
-      'file:snapshot-2026-01-14T15-00-00Z.json: could not be read',
-    );
+    expect(data).toMatchObject({
+      origin: 'file',
+      source: 'file:snapshot-2026-01-14T15-00-00Z.json',
+      skipped: [{ source: 'file:snapshot-2026-01-14T16-00-00Z.json' }],
+    });
   });
 });
 

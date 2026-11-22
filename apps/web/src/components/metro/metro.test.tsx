@@ -78,6 +78,21 @@ describe('Tile', () => {
   });
 });
 
+describe('Tile title link', () => {
+  it('stretches over the tile, lifts inner links and draws its focus ring inside the tile', () => {
+    const html = renderHtml(
+      <Tile title="Attention" titleHref="/attention" titleHrefHint="details" value={1}>
+        <a href="https://example.com/x">x</a>
+      </Tile>,
+    );
+    expect(html).toMatch(/<a[^>]*href="\/attention"[^>]*data-part="title-link"/);
+    expect(html).toContain(' details');
+    // The tile clips overflow, so an outset ring would be invisible (WCAG 2.4.7).
+    expect(html).toMatch(/outline-offset:\s*-6px/);
+    expect(html).not.toMatch(/::after[^}]*outline-offset:\s*3px/);
+  });
+});
+
 describe('PivotHeader', () => {
   it('renders the title as the page heading and marks the current pivot', () => {
     const html = renderMarkup(

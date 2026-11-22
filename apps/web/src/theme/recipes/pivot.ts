@@ -58,7 +58,13 @@ export const pivotRecipe = defineSlotRecipe({
         outlineColor: 'focusRing',
         outlineOffset: '2px',
       },
-      '&[aria-current]': { color: 'fg' },
+      // The current view differs by more than colour: it is underlined too (WCAG 1.4.1).
+      '&[aria-current]': {
+        color: 'fg',
+        textDecoration: 'underline',
+        textDecorationThickness: '2px',
+        textUnderlineOffset: '8px',
+      },
     },
   },
 });

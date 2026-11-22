@@ -15,9 +15,10 @@ system in the Microsoft Metro / Modern UI style. Read-only; every action is a li
 | Path                                | What it holds                                                                      |
 | ----------------------------------- | ---------------------------------------------------------------------------------- |
 | `src/server/snapshot.ts`            | `server-only`: resolves `WATCHMAN_SNAPSHOT_DIR` and reads the newest snapshot      |
-| `src/server/dashboard.ts`           | The cached read every route shares (`use cache`, re-read at least hourly)          |
+| `src/server/dashboard.ts`           | The cached read every route shares (`use cache`: revalidate 15 min, expire 1 h)    |
 | `src/lib/tiles.ts`, `details.ts`    | Pure snapshot → tile and drill-down view models                                    |
 | `src/lib/layout.ts`, `layout-store` | The tile layout model, its boot script and its `localStorage` store                |
+| `src/lib/refresh.ts`                | The idle-aware self-refresh that keeps an open page under an hour old              |
 | `src/components/dashboard/`         | The page shell with the data stamp, the home tiles, the layout board, table parts  |
 | `src/components/metro/`             | `Tile`, `TileGrid`, `TileList`, `PivotHeader`, `PageShell` and `Provenance`        |
 | `src/theme/`                        | Palette (WCAG AA accents), the Chakra system, the `metroTile`/`metroPivot` recipes |
@@ -43,9 +44,9 @@ Run it from the repository root (npm only):
 
 ```bash
 npm ci
-npm run dev:web                              # http://localhost:3000
+npm run dev:web                              # http://127.0.0.1:3000 (loopback only)
 npm run build                                # production build + client-bundle check
-npm run start --workspace @watchman/web      # serve the production build
+npm run start --workspace @watchman/web      # serve the production build on 127.0.0.1
 npm run e2e --workspace @watchman/web        # Playwright against the production build (local)
 npm test                                     # unit tests, this app's included
 ```

@@ -1,7 +1,7 @@
 import { DAY_MS, describeAge, formatAsOf, toMillis } from '@watchman/core';
 import type { ReactNode } from 'react';
 import { PageShell, PivotHeader } from '@/components/metro';
-import type { DashboardData } from '@/server/snapshot';
+import type { DashboardData } from '@/lib/dashboard-data';
 import { Badge, Notice, StatusBar } from './parts';
 
 export type DashboardView = 'start' | 'attention' | 'flow' | 'spend' | 'metrics';
@@ -67,8 +67,8 @@ export function DashboardShell({
         </span>
         <span>source {data.source}</span>
         <span data-testid="page-refreshed">
-          refreshed <time dateTime={data.read_at}>{formatAsOf(data.read_at)}</time> · re-read at
-          least hourly
+          refreshed <time dateTime={data.read_at}>{formatAsOf(data.read_at)}</time> · updates within
+          the hour
         </span>
       </StatusBar>
       {data.origin === 'unavailable' ? (
@@ -83,9 +83,11 @@ export function DashboardShell({
           last read. Run <code>npm run snapshot</code> to refresh it.
         </Notice>
       ) : null}
-      {snapshot.synthetic === true ? (
-        <Notice>
-          Synthetic data: invented projects, round invented figures and example.com links.
+      {data.origin === 'file' && data.skipped.length > 0 ? (
+        <Notice role="status">
+          Showing {data.source}: the newer{' '}
+          {data.skipped.length === 1 ? 'snapshot was' : 'snapshots were'} unusable (
+          {data.skipped.map((s) => s.problem).join('; ')}).
         </Notice>
       ) : null}
       {children}

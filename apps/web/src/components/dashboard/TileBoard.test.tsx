@@ -132,6 +132,13 @@ describe('TileBoard', () => {
     } as unknown as Storage);
     await click(button('Customise tiles'));
     await click(button('Move Flow up'));
-    expect(status()).toBe('Flow moved to position 1. Not saved: this browser blocks storage.');
+    expect(status()).toBe(
+      'Flow moved to position 1, for this page only: this browser does not allow saving it.',
+    );
+    // The move happened on screen even though it could not be saved.
+    expect(slots()).toEqual(['flow', 'attention', 'spend', 'metrics']);
+    expect(document.getElementById(LAYOUT_STYLE_ID)?.textContent).toContain(
+      '[data-tile-slot="flow"]>*{order:0}',
+    );
   });
 });

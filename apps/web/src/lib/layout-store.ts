@@ -34,12 +34,11 @@ export function getStoredLayout(): string | null {
   }
 }
 
-/** Rewrites the layout `<style>` from storage, so the CSS never disagrees with what is saved. */
-export function applyStoredLayoutCss(): void {
+/** Writes `layout` into the layout `<style>`, or removes it for `null` (the default). */
+export function applyLayoutCss(layout: Layout | null): void {
   if (typeof document === 'undefined') return;
-  const raw = getStoredLayout();
   let style = document.getElementById(LAYOUT_STYLE_ID);
-  if (raw === null) {
+  if (layout === null) {
     style?.remove();
     return;
   }
@@ -48,7 +47,13 @@ export function applyStoredLayoutCss(): void {
     style.id = LAYOUT_STYLE_ID;
     document.head.appendChild(style);
   }
-  style.textContent = layoutCss(readLayout(raw, TILE_IDS), TILE_SLOT_ATTRIBUTE);
+  style.textContent = layoutCss(layout, TILE_SLOT_ATTRIBUTE);
+}
+
+/** Rewrites the layout `<style>` from storage, so the CSS never disagrees with what is saved. */
+export function applyStoredLayoutCss(): void {
+  const raw = getStoredLayout();
+  applyLayoutCss(raw === null ? null : readLayout(raw, TILE_IDS));
 }
 
 function notify(): void {
@@ -56,7 +61,10 @@ function notify(): void {
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
-/** Saves `layout`. Returns false when storage refused it (the change then lasts this page only). */
+/**
+ * Saves `layout` and shows it. Returns false when storage refused it: the CSS still shows it, and
+ * the caller keeps it in memory, so the change lasts this page only.
+ */
 export function saveLayout(layout: Layout): boolean {
   let saved = false;
   try {
@@ -69,6 +77,7 @@ export function saveLayout(layout: Layout): boolean {
     saved = false;
   }
   if (saved) notify();
+  else applyLayoutCss(layout);
   return saved;
 }
 

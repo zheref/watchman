@@ -2,6 +2,7 @@ import { assertSnapshot, type Snapshot } from '@watchman/core';
 import empty from '@watchman/core/fixtures/synthetic/empty.json';
 import full from '@watchman/core/fixtures/synthetic/full.json';
 import manualOnly from '@watchman/core/fixtures/synthetic/manual-only.json';
+import pastReset from '@watchman/core/fixtures/synthetic/past-reset.json';
 import sparse from '@watchman/core/fixtures/synthetic/sparse.json';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderMarkup } from '@/test/render';
@@ -21,15 +22,20 @@ const fileData = (snapshot: Snapshot, read_at = READ_AT): DashboardData => ({
   snapshot,
   origin: 'file',
   source: 'file:snapshot-2026-01-14T15-00-00Z.json',
+  skipped: [],
   read_at,
 });
 const fullSnapshot = assertSnapshot(full);
+const never = (): never => {
+  throw new Error('unreachable');
+};
 
 beforeEach(() => {
   state.data = {
     snapshot: fullSnapshot,
     origin: 'synthetic-fixture',
     source: 'synthetic fixture full.json',
+    skipped: [],
     read_at: READ_AT,
   };
 });
@@ -57,7 +63,8 @@ describe('home', () => {
     expect(links).toHaveLength(5);
     expect(links[0]).toBe('https://example.com/orchard/cards/7');
     expect(attention).toContain('(opens example.com)');
-    expect(attention).toContain('top 5 of 6');
+    expect(attention).toContain('the 5 most urgent below');
+    expect(attention).toMatch(/data-part="value"[^>]*>6</);
   });
 
   it('stamps the page: synthetic badge, data as-of, source and the last read', async () => {
@@ -66,7 +73,7 @@ describe('home', () => {
     expect(html).toContain('<time dateTime="2026-01-14T15:00:00Z">2026-01-14 15:00 UTC</time>');
     expect(html).toContain('source synthetic fixture full.json');
     expect(html).toContain('<time dateTime="2026-01-14T16:00:00Z">2026-01-14 16:00 UTC</time>');
-    expect(html).toContain('re-read at least hourly');
+    expect(html).toContain('updates within the hour');
   });
 
   it('marks spend partial and shows metrics as no data', async () => {
@@ -111,8 +118,8 @@ describe('home', () => {
     expect(manual).toContain('manual entry');
     state.data = fileData(assertSnapshot(sparse));
     const html = await render(Home);
-    expect(html).toMatch(/project reports merge-priority metrics/);
-    expect(html).toMatch(/1 of 16 reported/);
+    expect(html).toMatch(/improving · 0 declining · 0 steady/);
+    expect(html).toMatch(/1 of 16 metrics reported/);
   });
 
   it('says when the configured snapshot cannot be shown, or is old', async () => {
@@ -168,6 +175,46 @@ describe('drill-downs', () => {
     for (const page of [AttentionPage, FlowPage, SpendPage, MetricsPage]) {
       expect(await render(page)).toContain('data-state="no-data"');
     }
+  });
+
+  it('covers the quieter arms: several PRs not yet due, no cost this month, over quota', async () => {
+    if (fullSnapshot.attention.state !== 'value') throw new Error('fixture');
+    const fresh = (id: string) => ({
+      ...(fullSnapshot.attention.state === 'value'
+        ? fullSnapshot.attention.candidates[0]!
+        : never()),
+      id,
+      kind: 'waiting_pr' as const,
+      waiting_since: '2026-01-14T10:00:00Z',
+    });
+    state.data = fileData({
+      ...fullSnapshot,
+      attention: {
+        ...fullSnapshot.attention,
+        candidates: [...fullSnapshot.attention.candidates, fresh('new-1'), fresh('new-2')],
+      },
+    });
+    expect(await render(AttentionPage)).toContain('3 more pull requests have not waited');
+
+    const past = assertSnapshot(pastReset);
+    state.data = fileData(past);
+    const spend = await render(SpendPage);
+    expect(spend).toContain('over quota');
+    expect(spend).toContain('no provider reported a cost for');
+    const flow = await render(FlowPage);
+    expect(flow).toContain('Nothing open has gone untouched that long.');
+  });
+
+  it('names newer snapshots it had to pass over', async () => {
+    state.data = {
+      ...fileData(fullSnapshot),
+      skipped: [
+        { source: 'file:snapshot-new.json', problem: 'file:snapshot-new.json: not valid JSON' },
+      ],
+    };
+    expect(await render(Home)).toContain(
+      'the newer snapshot was unusable (file:snapshot-new.json: not valid JSON)',
+    );
   });
 
   it('read-only: no form, no write control anywhere', async () => {

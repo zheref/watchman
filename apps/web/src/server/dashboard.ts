@@ -1,14 +1,22 @@
 import 'server-only';
 
 import { cacheLife } from 'next/cache';
-import { readDashboardData, type DashboardData } from './snapshot';
+import type { DashboardData } from '@/lib/dashboard-data';
+import { SERVER_EXPIRE_SECONDS, SERVER_REVALIDATE_SECONDS } from '@/lib/refresh';
+import { readDashboardData } from './snapshot';
 
 /**
- * How often the dashboard re-reads its snapshot: at most an hour. After `revalidate` seconds the
- * next request is served the cached page while a fresh one is rendered in the background, and
- * the page's "refreshed" stamp moves with it; `expire` forces a fresh read after a quiet day.
+ * How the dashboard's snapshot read is cached. A request more than `revalidate` seconds after the
+ * last read is served it while a fresh read renders in the background (stale-while-revalidate);
+ * past `expire` the request waits for a fresh read, so nothing served is over an hour old. Open
+ * pages reload themselves every 20 minutes (lib/refresh.ts), and the page's "refreshed" stamp
+ * says when its read happened.
  */
-export const SNAPSHOT_CACHE = { stale: 300, revalidate: 3600, expire: 86_400 } as const;
+export const SNAPSHOT_CACHE = {
+  stale: 300,
+  revalidate: SERVER_REVALIDATE_SECONDS,
+  expire: SERVER_EXPIRE_SECONDS,
+} as const;
 
 /**
  * The snapshot every dashboard route reads, cached on the server (`use cache`) and shared by the

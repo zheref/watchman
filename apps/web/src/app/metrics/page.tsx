@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { DashboardShell } from '@/components/dashboard/DashboardShell';
 import {
   BackToStart,
-  DataTable,
+  ScrollingTable as DataTable,
   DetailSection,
   GapList,
   NoDataBlock,
@@ -23,7 +23,7 @@ const ARROW = { up: '▲', down: '▼', flat: '▬', single: '' } as const;
 const WORD = { up: 'up', down: 'down', flat: 'unchanged', single: 'one reading' } as const;
 
 function trendCell(cell: MetricCellView) {
-  if (cell.trend.state === 'no_data') return 'no data';
+  if (cell.trend.state === 'no_data') return `no data: ${cell.trend.reason}`;
   const t = cell.trend;
   const delta = t.delta === null ? '' : ` (${t.delta > 0 ? '+' : ''}${t.delta})`;
   return (

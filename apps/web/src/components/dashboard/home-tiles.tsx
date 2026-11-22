@@ -55,6 +55,12 @@ export function homeTiles(snapshot: Snapshot, now: Date, options: ViewOptions = 
     spend: gapLines(snapshot, 'spend'),
     metrics: gapLines(snapshot, 'metrics'),
   };
+  const waiting =
+    attentionAll.state === 'value'
+      ? attentionAll.items.length
+      : attention.state === 'value'
+        ? attention.items.length
+        : 0;
   const partial = (key: SectionKey) => (gaps[key].length > 0 ? 'partial' : undefined);
   const link = (id: TileId) => ({ titleHref: `/${id}`, titleHrefHint: 'details' });
 
@@ -72,13 +78,14 @@ export function homeTiles(snapshot: Snapshot, now: Date, options: ViewOptions = 
         title="Attention"
         size="large"
         accent="cobalt"
-        value={attention.items.length}
+        // The headline is everything waiting; the list is the most valuable and urgent few.
+        value={waiting}
         caption={
-          attention.items.length === 0
+          waiting === 0
             ? 'nothing needs your yes'
-            : `${attention.items.length === 1 ? 'item needs' : 'items need'} your yes${
-                attentionAll.state === 'value' && attentionAll.items.length > attention.items.length
-                  ? ` · top ${attention.items.length} of ${attentionAll.items.length}`
+            : `${waiting === 1 ? 'item needs' : 'items need'} your yes${
+                waiting > attention.items.length
+                  ? ` · the ${attention.items.length} most urgent below`
                   : ''
               }`
         }
@@ -186,13 +193,20 @@ export function homeTiles(snapshot: Snapshot, now: Date, options: ViewOptions = 
       >
         <TileLines
           lines={[
-            ...spend.providers.map((p) => ({
-              key: p.id,
-              text:
-                p.quota.state === 'no_data'
-                  ? `${p.label}: quota no data`
-                  : `${p.label}: ${p.quota.percent}% of quota${p.quota.exceeded ? ' (over)' : ''} · resets in ${p.quota.countdown.label}${p.quota.manual ? ' · manual' : ''}`,
-            })),
+            // Riskiest quota first: the highest share used, providers with no reading last.
+            ...[...spend.providers]
+              .sort(
+                (a, b) =>
+                  (b.quota.state === 'value' ? b.quota.fraction : -1) -
+                  (a.quota.state === 'value' ? a.quota.fraction : -1),
+              )
+              .map((p) => ({
+                key: p.id,
+                text:
+                  p.quota.state === 'no_data'
+                    ? `${p.label}: quota no data`
+                    : `${p.label}: ${p.quota.percent}% of quota${p.quota.exceeded ? ' (over)' : ''} · resets in ${p.quota.countdown.label}${p.quota.manual ? ' · manual' : ''}`,
+              })),
             ...gaps.spend,
           ]}
         />
@@ -200,6 +214,16 @@ export function homeTiles(snapshot: Snapshot, now: Date, options: ViewOptions = 
     );
 
   const reporting = metrics.state === 'value' ? metrics.projects.filter((p) => p.reported > 0) : [];
+  // Latest change of every reported metric across projects; a single reading has no trend yet.
+  const trends = { up: 0, down: 0, flat: 0 };
+  for (const project of reporting) {
+    for (const cell of project.cells) {
+      if (cell.trend.state !== 'value') continue;
+      if (cell.trend.direction === 'up') trends.up += 1;
+      else if (cell.trend.direction === 'down') trends.down += 1;
+      else if (cell.trend.direction === 'flat') trends.flat += 1;
+    }
+  }
   const metricsTile =
     metrics.state === 'no_data' || reporting.length === 0 ? (
       <Tile
@@ -218,8 +242,8 @@ export function homeTiles(snapshot: Snapshot, now: Date, options: ViewOptions = 
         title="Metrics"
         size="wide"
         accent="violet"
-        value={reporting.length}
-        caption={`${reporting.length === 1 ? 'project reports' : 'projects report'} merge-priority metrics`}
+        value={trends.up}
+        caption={`${trends.up === 1 ? 'metric' : 'metrics'} improving · ${trends.down} declining · ${trends.flat} steady`}
         badge={partial('metrics') ?? (metrics.stamp.manual === true ? 'manual' : undefined)}
         provenance={metrics.stamp}
         index={3}
@@ -229,7 +253,7 @@ export function homeTiles(snapshot: Snapshot, now: Date, options: ViewOptions = 
           lines={[
             ...reporting.slice(0, 3).map((p) => ({
               key: p.project,
-              text: `${p.project}: ${p.reported} of ${p.cells.length} reported`,
+              text: `${p.project}: ${p.reported} of ${p.cells.length} metrics reported`,
             })),
             ...gaps.metrics,
           ]}

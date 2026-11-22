@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { DashboardShell } from '@/components/dashboard/DashboardShell';
 import {
   BackToStart,
-  DataTable,
+  ScrollingTable as DataTable,
   DetailSection,
   GapList,
   NoDataBlock,

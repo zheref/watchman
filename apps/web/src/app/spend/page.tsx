@@ -4,7 +4,7 @@ import { DashboardShell } from '@/components/dashboard/DashboardShell';
 import {
   BackToStart,
   Badge,
-  DataTable,
+  ScrollingTable as DataTable,
   DetailSection,
   GapList,
   Meter,
@@ -73,7 +73,16 @@ export default async function SpendPage() {
                 key: c.id,
                 cells:
                   c.cost.state === 'no_data'
-                    ? [c.label, 'no data', c.cost.reason, <Provenance key="s" {...c.cost.stamp} />]
+                    ? [
+                        c.label,
+                        'no data',
+                        '—',
+                        <span key="s">
+                          {c.cost.reason}
+                          <br />
+                          <Provenance {...c.cost.stamp} />
+                        </span>,
+                      ]
                     : [c.label, c.cost.usd, c.cost.cop, <Provenance key="s" {...c.cost.stamp} />],
               }))}
             />
@@ -95,7 +104,12 @@ export default async function SpendPage() {
                 key: p.id,
                 cells:
                   p.quota.state === 'no_data'
-                    ? [p.label, 'no data', p.quota.reason, <Provenance key="s" {...p.quota} />]
+                    ? [
+                        p.label,
+                        `no data: ${p.quota.reason}`,
+                        '—',
+                        <Provenance key="s" source={p.quota.source} as_of={p.quota.as_of} />,
+                      ]
                     : [
                         p.label,
                         <span key="used">

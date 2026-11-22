@@ -49,8 +49,8 @@ export interface TileProps {
 
 /**
  * The title link's `::after` covers the tile, so the whole tile is the target; the tile's own
- * links (`a` inside the body) are lifted above it. The focus ring is drawn on the cover, so it
- * outlines the whole tile.
+ * links (`a` inside the body) are lifted above it. The focus ring is drawn on the cover, inset
+ * (negative offset) because the tile clips anything outside its edge.
  */
 const STRETCHED_LINK = {
   color: 'inherit',
@@ -61,7 +61,7 @@ const STRETCHED_LINK = {
     outlineWidth: '3px',
     outlineStyle: 'solid',
     outlineColor: 'focusRing',
-    outlineOffset: '3px',
+    outlineOffset: '-6px',
   },
   '&:hover': { textDecoration: 'underline' },
 } as const;

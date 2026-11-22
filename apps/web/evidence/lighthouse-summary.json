@@ -7,9 +7,9 @@
       "accessibility": 100,
       "performance": 100,
       "best_practices": 100,
-      "fcp_ms": 906,
-      "lcp_ms": 906,
-      "tbt_ms": 57,
+      "fcp_ms": 905,
+      "lcp_ms": 905,
+      "tbt_ms": 49,
       "cls": 0
     },
     "/attention": {
@@ -18,15 +18,15 @@
       "best_practices": 100,
       "fcp_ms": 902,
       "lcp_ms": 902,
-      "tbt_ms": 54,
+      "tbt_ms": 50,
       "cls": 0
     },
     "/flow": {
       "accessibility": 100,
       "performance": 100,
       "best_practices": 100,
-      "fcp_ms": 903,
-      "lcp_ms": 903,
+      "fcp_ms": 902,
+      "lcp_ms": 902,
       "tbt_ms": 53,
       "cls": 0
     },
@@ -34,9 +34,9 @@
       "accessibility": 100,
       "performance": 100,
       "best_practices": 100,
-      "fcp_ms": 903,
-      "lcp_ms": 903,
-      "tbt_ms": 53,
+      "fcp_ms": 902,
+      "lcp_ms": 902,
+      "tbt_ms": 56,
       "cls": 0
     },
     "/metrics": {
@@ -45,9 +45,9 @@
       "best_practices": 100,
       "fcp_ms": 902,
       "lcp_ms": 902,
-      "tbt_ms": 48,
+      "tbt_ms": 47,
       "cls": 0
     }
   },
-  "fetched_at": "2026-11-22T20:31:31.554Z"
+  "fetched_at": "2026-11-22T20:49:15.131Z"
 }

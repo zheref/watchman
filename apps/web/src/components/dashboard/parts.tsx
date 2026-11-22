@@ -197,6 +197,25 @@ export function DataTable({
   );
 }
 
+/** A table with a hint, on narrow screens only, that it scrolls sideways inside itself. */
+export function ScrollingTable(props: Parameters<typeof DataTable>[0]) {
+  return (
+    <>
+      <chakra.p
+        aria-hidden="true"
+        display={{ base: 'block', md: 'none' }}
+        m="0"
+        mb="1"
+        textStyle="metro.caption"
+        color="fg.muted"
+      >
+        Scroll the table sideways for every column →
+      </chakra.p>
+      <DataTable {...props} />
+    </>
+  );
+}
+
 /** A link styled for the dark canvas: underlined, with a visible focus ring and a 44px row. */
 export function TextLink({ href, children }: { href: string; children: ReactNode }) {
   return (

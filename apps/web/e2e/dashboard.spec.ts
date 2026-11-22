@@ -62,7 +62,7 @@ test('home: four tiles, the synthetic badge and the page as-of stamp', async ({ 
   }
   await expect(page.getByText('synthetic data', { exact: true })).toBeVisible();
   await expect(page.getByTestId('page-as-of')).toContainText('Data as of 2026-01-14 15:00 UTC');
-  await expect(page.getByTestId('page-refreshed')).toContainText('re-read at least hourly');
+  await expect(page.getByTestId('page-refreshed')).toContainText('updates within the hour');
   expect(errors).toEqual([]);
 });
 
@@ -178,6 +178,32 @@ test('layout customisation by keyboard persists across reload, with no flash and
   await page.reload();
   expect(await tileTitles(page)).toEqual(['attention', 'flow', 'spend', 'metrics']);
   expect(errors).toEqual([]);
+});
+
+test('the served page carries the idle-aware self-refresh', async ({ page }) => {
+  // Its timing is proved in src/lib/refresh.test.ts, which runs this same script text under fake
+  // timers; Playwright's fake clock stalls the Next.js runtime, so here the check is that the
+  // production page ships it, with the 20-minute period and 2-minute idle wait.
+  const response = await page.goto('/');
+  const html = (await response?.text()) ?? '';
+  expect(html).toContain('location.reload()');
+  expect(html).toMatch(/\(window,1200000,120000\)/);
+});
+
+test('the focus ring on a tile title is visible inside the tile', async ({ page }) => {
+  await page.goto('/');
+  const link = page.getByRole('link', { name: 'Attention details' });
+  await link.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  const ring = await link.evaluate((a) => {
+    const after = getComputedStyle(a, '::after');
+    return { style: after.outlineStyle, width: after.outlineWidth, offset: after.outlineOffset };
+  });
+  expect(ring).toEqual({ style: 'solid', width: '3px', offset: '-6px' });
+  await settle(page);
+  const tile = page.locator('[data-tile-slot="attention"] > :not(style)');
+  await tile.screenshot({ path: `${evidenceDir}/focus-ring-attention.png` });
 });
 
 test('home view timing on the production build', async ({ page }) => {

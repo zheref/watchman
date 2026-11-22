@@ -9,6 +9,7 @@ import {
   isDefaultLayout,
   moveTile,
   readLayout,
+  serializeLayout,
   setTileHidden,
   type TileId,
 } from '@/lib/layout';
@@ -57,7 +58,9 @@ export function TileBoard({ tiles }: { tiles: BoardTile[] }) {
     sync();
     return subscribeLayout(sync);
   }, []);
-  const layout = useMemo(() => readLayout(raw, TILE_IDS), [raw]);
+  // A change storage refused lives here, for this page only.
+  const [unsaved, setUnsaved] = useState<string | null>(null);
+  const layout = useMemo(() => readLayout(unsaved ?? raw, TILE_IDS), [unsaved, raw]);
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
   // The button to refocus after a move re-renders the panel: `<tile id>:up` or `:down`.
@@ -87,9 +90,13 @@ export function TileBoard({ tiles }: { tiles: BoardTile[] }) {
   }, [layout]);
 
   const commit = (next: typeof layout, announce: string) => {
-    setMessage(
-      saveLayout(next) ? announce : `${announce}. Not saved: this browser blocks storage.`,
-    );
+    if (saveLayout(next)) {
+      setUnsaved(null);
+      setMessage(announce);
+    } else {
+      setUnsaved(serializeLayout(next));
+      setMessage(`${announce}, for this page only: this browser does not allow saving it.`);
+    }
   };
 
   return (
@@ -203,6 +210,7 @@ export function TileBoard({ tiles }: { tiles: BoardTile[] }) {
             disabled={isDefaultLayout(layout)}
             onClick={() => {
               resetLayout();
+              setUnsaved(null);
               setMessage('Layout reset to the default');
             }}
           >

@@ -1,26 +1,23 @@
-// Build-output guard, run after `next build` (see package.json "build"). It proves that nothing
-// the server uses to find its data reaches a browser:
+// Build-output tripwire, run after `next build` (see package.json "build"). It checks that nothing
+// the server uses to find its data reached what a browser downloads:
 //
-// 1. Every file under .next/static (the client bundle, shipped to every visitor) is free of the
-//    snapshot directory's variable name, Node file-system imports and the server-only loader.
-// 2. When the build ran with WATCHMAN_SNAPSHOT_DIR set, its VALUE (the directory path) appears in
-//    no client file and in no prerendered page or RSC payload under .next/server/app either.
+// 1. No file under .next/static (the client bundle, shipped to every visitor) contains the snapshot
+//    directory's variable name, Node's file-system module, or the loader's own error text.
+// 2. When the build ran with WATCHMAN_SNAPSHOT_DIR set, none of the directory's spellings (as
+//    given, without trailing separators, resolved through symlinks, JSON-escaped) appears in a
+//    client file, or in a page or RSC payload prerendered under .next/server/app.
 //
-// Exit 0 when clean, 1 when a forbidden string is found (each hit printed without its context),
-// 2 when there is no build output to check.
-import { readdir, readFile, stat } from 'node:fs/promises';
+// It is a tripwire over the build's output, not a proof about every response: pages rendered at
+// runtime are not scanned (src/server/boundary.test.ts and the server-only import guard the
+// source side). Exit 0 clean, 1 on a hit (each printed without context), 2 with no build output.
+import { readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const appDir = fileURLToPath(new URL('..', import.meta.url));
-const nextDir = join(appDir, '.next');
-
-/** Strings no client file may contain. */
+/** Strings no client file may contain. Literal text only: a minifier renames identifiers. */
 export const CLIENT_FORBIDDEN = [
   'WATCHMAN_SNAPSHOT_DIR',
   'node:fs',
-  'readDashboardData',
-  'getDashboardData',
   'snapshot directory could not be listed',
 ];
 
@@ -41,7 +38,21 @@ async function exists(path) {
   }
 }
 
-/** Every [file, needle] pair where `needle` occurs in a text file under `dir`. */
+/** Every spelling of `dir` worth looking for: as given, trimmed of separators, real, escaped. */
+export async function directorySpellings(dir) {
+  const given = dir.trim();
+  const bare = given.replace(/[\\/]+$/, '') || given;
+  const forms = new Set([given, bare]);
+  try {
+    forms.add(await realpath(bare));
+  } catch {
+    // A directory that does not exist has no other real spelling.
+  }
+  for (const form of [...forms]) forms.add(JSON.stringify(form).slice(1, -1));
+  return [...forms].filter((form) => form.length > 1);
+}
+
+/** Every [file, needle] pair where `needle` occurs in a file under `dir` with one of `extensions`. */
 export async function findHits(dir, needles, extensions) {
   const hits = [];
   for await (const file of walk(dir)) {
@@ -52,32 +63,45 @@ export async function findHits(dir, needles, extensions) {
   return hits;
 }
 
-async function main() {
+/** Runs the check over the build in `nextDir`; returns the exit code and the lines to print. */
+export async function checkBuild(nextDir, dirValue) {
   const staticDir = join(nextDir, 'static');
   const serverAppDir = join(nextDir, 'server', 'app');
   if (!(await exists(staticDir))) {
-    console.error('check-client-bundle: no .next/static; run `next build` first');
-    return 2;
+    return { code: 2, lines: ['check-client-bundle: no .next/static; run `next build` first'] };
   }
-  const dirValue = process.env.WATCHMAN_SNAPSHOT_DIR?.trim();
+  const spellings = dirValue?.trim() ? await directorySpellings(dirValue) : [];
   const hits = await findHits(
     staticDir,
-    dirValue ? [...CLIENT_FORBIDDEN, dirValue] : CLIENT_FORBIDDEN,
-    ['.js', '.css', '.json', '.html', '.txt'],
+    [...CLIENT_FORBIDDEN, ...spellings],
+    ['.js', '.css', '.json', '.html', '.txt', '.map'],
   );
-  if (dirValue && (await exists(serverAppDir))) {
-    hits.push(...(await findHits(serverAppDir, [dirValue], ['.html', '.rsc', '.meta', '.body'])));
+  if (spellings.length > 0 && (await exists(serverAppDir))) {
+    hits.push(...(await findHits(serverAppDir, spellings, ['.html', '.rsc', '.meta', '.body'])));
   }
-  for (const [file, needle] of hits) {
-    const label = needle === dirValue ? 'the WATCHMAN_SNAPSHOT_DIR value' : JSON.stringify(needle);
-    console.error(`check-client-bundle: ${label} found in ${relative(appDir, file)}`);
+  if (hits.length > 0) {
+    return {
+      code: 1,
+      lines: hits.map(([file, needle]) => {
+        const label = spellings.includes(needle)
+          ? 'the WATCHMAN_SNAPSHOT_DIR value'
+          : JSON.stringify(needle);
+        return `check-client-bundle: ${label} found in ${relative(join(nextDir, '..'), file)}`;
+      }),
+    };
   }
-  if (hits.length > 0) return 1;
-  console.log(
-    `check-client-bundle: client bundle clean (${CLIENT_FORBIDDEN.length} server-only markers` +
-      `${dirValue ? ', and the snapshot directory in client files and prerendered pages' : ''})`,
-  );
-  return 0;
+  return {
+    code: 0,
+    lines: [
+      `check-client-bundle: client bundle clean (${CLIENT_FORBIDDEN.length} server-only markers` +
+        `${spellings.length > 0 ? `, ${spellings.length} spellings of the snapshot directory in client files and prerendered pages` : ''})`,
+    ],
+  };
 }
 
-process.exitCode = await main();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const nextDir = join(fileURLToPath(new URL('..', import.meta.url)), '.next');
+  const { code, lines } = await checkBuild(nextDir, process.env.WATCHMAN_SNAPSHOT_DIR);
+  for (const line of lines) (code === 0 ? console.log : console.error)(line);
+  process.exitCode = code;
+}

@@ -76,10 +76,14 @@ Everything the dashboard shows comes from one versioned document, the **snapshot
 - A built snapshot also lists its `sources`: each adapter, the sections it `feeds`, its `status`
   (`value`, `no_data` or `failed`) and the reason. That is how a reader of the file alone can tell
   a complete section from one merged without a source that failed or had no data.
-- The adapters: a **file** adapter that reads a whole snapshot from the directory in
-  `WATCHMAN_SNAPSHOT_DIR` (server-side only, no default), a read-only **GitHub** adapter, four **manual-export** adapters and a
-  Metrics placeholder that always reports "no data". The last six are what `npm run snapshot`
-  runs; see [Building a real snapshot](#building-a-real-snapshot).
+- Reading: `readLatestSnapshot` reads the newest usable `snapshot-<ISO>.json` (else
+  `snapshot.json`) from the directory in `WATCHMAN_SNAPSHOT_DIR` (server-side only, no default),
+  with file reading injected and no path in any message; the web app reads through it, and the
+  MCP server will too.
+- The adapters: a **file** adapter that reports one named snapshot file as a source, a read-only
+  **GitHub** adapter, four **manual-export** adapters and a Metrics placeholder that always
+  reports "no data". The last six are what `npm run snapshot` runs; see
+  [Building a real snapshot](#building-a-real-snapshot).
 - Seven synthetic fixtures live in `packages/core/fixtures/synthetic/` (full, sparse, empty, mixed
   stamps, overflow, past reset, manual only). They are for tests and the `/theme` preview only; a
   test validates every one and checks it is marked synthetic and links only to `example.com`.
@@ -120,7 +124,8 @@ npm run snapshot -- --out /path/outside/the/repo [--no-github]
   placeholder, since adapter ids are unique), plus its own key in the config schema if it needs
   settings.
 - **The web app** reads the newest `snapshot-<ISO>.json` in `WATCHMAN_SNAPSHOT_DIR` (a hand-placed
-  `snapshot.json` when there is none), on the server, at most an hour old; see
+  `snapshot.json` when there is none) on the server, re-reading it within the hour; how old the
+  snapshot itself is depends on how often `npm run snapshot` runs. See
   [The web dashboard](#the-web-dashboard).
 
 | Source              | Adapter             | Feeds                                                                                                                                                                 | When it is missing                     |
@@ -253,14 +258,23 @@ control anywhere.
   renders the default order, so hydration never mismatches.
 - **Data, server-side only.** Server components read the snapshot through `packages/core` in
   `src/server/` (`server-only`): the newest `snapshot-<ISO>.json` in `WATCHMAN_SNAPSHOT_DIR`, or the
-  committed synthetic fixture `full.json` when the variable is unset. A configured directory that
-  cannot be read shows every tile as "no data" with the reason, never the fixture. The read is
-  cached with `use cache` and `cacheLife({ revalidate: 3600 })`, so every view re-reads at least
-  hourly (the build output lists each route at `Revalidate 1h`). The directory path, and any future
-  token, never reach a browser: `npm run build` ends with `scripts/check-client-bundle.mjs`, which
-  fails the build if the client bundle names the variable, Node's file system or the loader, or
-  (when the build ran with the variable set) contains its value anywhere in the client bundle or a
-  prerendered page.
+  committed synthetic fixture `full.json` when the variable is unset. A newest file that is
+  half-written or invalid is passed over for the one before it, with a notice; a configured
+  directory that cannot be read shows every tile as "no data" with the reason, never the fixture.
+- **Freshness.** The read is cached with `use cache` and `cacheLife` (revalidate 15 minutes,
+  expire 1 hour; the build output lists each route at `Revalidate 15m, Expire 1h`): a request
+  after 15 minutes is served the cached read while a fresh one renders, and nothing over an hour
+  old is ever served. An open page reloads itself after 20 minutes, once the tab is hidden or the
+  reader has been idle for 2 minutes (it never reloads under someone reading or typing), so what is
+  on screen stays under an hour old. The page's "refreshed" stamp says when its read happened;
+  the data's own as-of time says how old the snapshot is.
+- **Nothing reaches a browser that names the data's location.** `npm run build` ends with
+  `scripts/check-client-bundle.mjs`, a tripwire over the build output: it fails if the client
+  bundle names the variable, Node's file system or the loader's error text, or (when the build
+  ran with the variable set) contains any spelling of its value in the client bundle or a
+  prerendered page. Pages rendered later at runtime are covered by the source-side guards
+  (`server-only`, `src/server/boundary.test.ts`) and by messages that carry file names and error
+  codes only.
 - **Checks in a browser (local, not CI).** `npm run build && npm run e2e --workspace @watchman/web`
   runs Playwright against the production build on the installed Chrome: the four tiles, every
   Attention deep link, each drill-down and the way back, no sideways scrolling at 390 px and
@@ -284,9 +298,12 @@ Nothing is deployed yet, and no agent deploys it. Before any deploy exists, the 
 
 Locally, real data needs no deploy: build and start with the same variable,
 `WATCHMAN_SNAPSHOT_DIR=/path/outside/the/repo npm run build` then
-`WATCHMAN_SNAPSHOT_DIR=/path/outside/the/repo npm run start --workspace @watchman/web`. The
-prerendered pages then hold real figures in `apps/web/.next/`, which is git-ignored and never
-committed.
+`WATCHMAN_SNAPSHOT_DIR=/path/outside/the/repo npm run start --workspace @watchman/web`. Both
+`dev` and `start` listen on `127.0.0.1` only, because the dashboard has no login of its own: do
+not widen that with `-H 0.0.0.0` while real data is loaded. The prerendered pages then hold real
+figures in `apps/web/.next/`, which is git-ignored and never committed — and **never deploy a
+build made with the variable set** (for example with `vercel deploy --prebuilt`): it would ship
+those figures. Deploys build from source, without the variable.
 
 ## Getting started
 
