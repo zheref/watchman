@@ -15,6 +15,8 @@ import {
   attentionTile,
   attentionTileFromJson,
   linkHost,
+  showManualBadge,
+  stampText,
   tileLabel,
   waitedLabel,
 } from './attention-view';
@@ -203,5 +205,24 @@ describe('plain-word helpers', () => {
     expect(linkHost('https://github.com/zheref/x/pull/1?a=b')).toBe('github.com');
     expect(linkHost('https://Example.COM:8443/p')).toBe('example.com');
     expect(linkHost('not a link')).toBe('');
+  });
+});
+
+describe('the pieces the tile component prints', () => {
+  const stamp = { source: 'synthetic-board', asOf: 'x', asOfLabel: '2026-01-14 14:30 UTC' };
+
+  it('stampText joins source and as-of, and marks a manual entry', () => {
+    expect(stampText({ ...stamp, manual: false })).toBe(
+      'synthetic-board · as of 2026-01-14 14:30 UTC',
+    );
+    expect(stampText({ ...stamp, manual: true })).toBe(
+      'synthetic-board · as of 2026-01-14 14:30 UTC · manual entry',
+    );
+  });
+
+  it('wears the manual badge only for a value whose figures were typed in', () => {
+    expect(showManualBadge(attentionTile(snapshotOf(manualOnly)))).toBe(true);
+    expect(showManualBadge(loadAttentionTile())).toBe(false);
+    expect(showManualBadge(attentionTileFromJson({}))).toBe(false);
   });
 });

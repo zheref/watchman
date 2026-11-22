@@ -55,6 +55,11 @@ const stampOf = (p: Provenance): StampView => ({
   manual: p.manual === true,
 });
 
+/** "synthetic-board · as of 2026-01-14 14:30 UTC · manual entry": the stamp every figure carries. */
+export function stampText(stamp: StampView): string {
+  return `${stamp.source} · as of ${stamp.asOfLabel}${stamp.manual ? ' · manual entry' : ''}`;
+}
+
 export interface AttentionItemView {
   id: string;
   /** 1-based position in the ranking. */
@@ -91,6 +96,11 @@ export type AttentionTileView =
       stamp: StampView;
       synthetic: boolean;
     };
+
+/** Whether the tile wears a "manual" badge: a value whose figures a person typed in. */
+export function showManualBadge(view: AttentionTileView): boolean {
+  return view.state === 'value' && view.stamp.manual;
+}
 
 /** The screen reader's name for the whole tile. */
 export function tileLabel(view: AttentionTileView): string {

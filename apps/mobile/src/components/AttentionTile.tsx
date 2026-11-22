@@ -1,14 +1,9 @@
 import { useCallback, useState } from 'react';
 import { AccessibilityInfo, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { AttentionItemView, AttentionTileView, StampView } from '../lib/attention-view';
-import { tileLabel } from '../lib/attention-view';
+import type { AttentionItemView, AttentionTileView } from '../lib/attention-view';
+import { showManualBadge, stampText, tileLabel } from '../lib/attention-view';
 import { LINK_FAILED_MESSAGE, openLink } from '../lib/open-link';
 import { COLORS, FONT, LINE, MIN_TARGET, SPACE, TRACK, TYPE, lineHeight } from '../theme';
-
-/** "synthetic-board · as of 2026-01-14 14:30 UTC · manual entry": the stamp every figure carries. */
-function stampText(stamp: StampView): string {
-  return `${stamp.source} · as of ${stamp.asOfLabel}${stamp.manual ? ' · manual entry' : ''}`;
-}
 
 function Badge({ children }: { children: string }) {
   return (
@@ -80,7 +75,7 @@ export function AttentionTile({ view }: { view: AttentionTileView }) {
       <View style={styles.header}>
         <Text style={styles.title}>Attention</Text>
         {view.synthetic ? <Badge>synthetic</Badge> : null}
-        {view.state === 'value' && view.stamp.manual ? <Badge>manual</Badge> : null}
+        {showManualBadge(view) ? <Badge>manual</Badge> : null}
       </View>
 
       {view.state === 'no_data' ? (

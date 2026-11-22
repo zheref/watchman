@@ -20,9 +20,10 @@ shows and how it reuses `packages/core`.
 
 ## Layout
 
-- `src/app/` is the one Expo Router directory: `_layout.tsx` and `index.tsx` (the home screen).
-- `src/components/AttentionTile.tsx` draws the tile from a view; it holds no ranking logic.
+- `src/app/` is the one Expo Router directory: `_layout.tsx` and `index.tsx`, which only binds the home route to `src/components/AttentionScreen.tsx`.
+- `src/components/` draws the screen and the tile from a view; it holds no ranking logic.
 - `src/lib/attention-view.ts` is the view-model: `@watchman/core`'s ranking and provenance turned
-  into the words and figures the screen prints. It is pure and unit-tested.
+  into the words and figures the screen prints (stamp text, badge rule included). It is pure and unit-tested.
+- `src/lib/open-link.ts` opens a deep link through an injected opener and reports the outcome; pure and unit-tested.
 - `src/lib/load-attention.ts` reads the bundled synthetic fixture through core's validation.
 - `src/palette.ts` and `src/theme.ts` are the Metro colours, type scale and spacing.
