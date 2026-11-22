@@ -56,7 +56,9 @@ export function main(
   try {
     resolveTransport(io.env);
     const now = resolveClock(io.env);
-    return serve(() => createWatchmanServer({ now, load: (at) => loadSnapshot(io.env, at) }), {
+    const log = (message: string) => io.error(`watchman-mcp: ${message}`);
+    const deps = { now, load: (at: Date) => loadSnapshot(io.env, at), log };
+    return serve(() => createWatchmanServer(deps), {
       onerror: (error) => io.error(`watchman-mcp: ${error.message}`),
     });
   } catch (error) {

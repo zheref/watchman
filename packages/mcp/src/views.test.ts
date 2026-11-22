@@ -20,19 +20,19 @@ const loaded = (
 ): LoadedSnapshot => ({
   snapshot: assertSnapshot(json),
   origin: 'synthetic-fixture',
-  file: 'synthetic fixture',
+  source: 'synthetic fixture',
   skipped: [],
   ...overrides,
 });
 
 const FULL = loaded(full);
-const SPARSE = loaded(sparse, { origin: 'file', file: 'file:snapshot-x.json' });
+const SPARSE = loaded(sparse, { origin: 'file', source: 'file:snapshot-x.json' });
 const EMPTY = loaded(empty);
 
 /** A copy of full.json that is not marked synthetic, read from a file. */
 const REAL_LOOKING = loaded({ ...full, synthetic: undefined } as unknown, {
   origin: 'file',
-  file: 'file:snapshot-2026-01-14T15-00-00Z.json',
+  source: 'file:snapshot-2026-01-14T15-00-00Z.json',
   skipped: [{ source: 'file:snapshot-2026-01-14T16-00-00Z.json', problem: 'not valid JSON' }],
 });
 
@@ -48,7 +48,8 @@ describe('the envelope', () => {
       NOW,
     );
     expect(out).toMatchObject({
-      source: 'synthetic',
+      // The combined provenance of the section and every item behind its figures.
+      source: 'synthetic + synthetic-board + synthetic-forge',
       as_of: '2026-01-14T14:30:00Z',
       synthetic: true,
       evaluated_at: NOW.toISOString(),
@@ -81,6 +82,29 @@ describe('the envelope', () => {
       { adapter: 'forge', status: 'failed', reason: 'timed out' },
       { adapter: 'board', status: 'no_data' },
     ]);
+  });
+});
+
+describe('the section stamp', () => {
+  it('names every contributing source, keeps the oldest as_of and marks manual parts', () => {
+    const spend = spendView(FULL, {}, NOW);
+    // The manual cost reading (as of the 13th) is in the month's total.
+    expect(spend).toMatchObject({ as_of: '2026-01-13T12:00:00Z' });
+    expect(spend.source.split(' + ')).toEqual(
+      expect.arrayContaining(['manual entry', 'synthetic', 'synthetic-billing', 'synthetic-usage']),
+    );
+    expect(spend.spend).toMatchObject({ manual: true, as_of: '2026-01-13T12:00:00Z' });
+    const metrics = metricsView(SPARSE, {}, NOW);
+    expect(metrics.source).toBe('synthetic-scorecard');
+    expect(metrics.metrics).toMatchObject({ source: 'synthetic-scorecard' });
+  });
+
+  it('covers the board only when the board is shown', () => {
+    expect(flowView(FULL, {}, NOW).source).toContain('synthetic-board');
+    const json = structuredClone(full) as typeof full;
+    json.flow.work_items = json.flow.work_items.filter((w) => w.source !== 'synthetic-board');
+    const projectOnly = flowView(loaded(json), { project: 'Demo Lighthouse' }, NOW);
+    expect(projectOnly.source).not.toContain('synthetic-board');
   });
 });
 
@@ -131,12 +155,22 @@ describe('attentionView', () => {
     }
   });
 
-  it('answers an empty list for an unknown project', () => {
+  it('answers no_data for a project the snapshot does not know, and zeros for one it does', () => {
     expect(attentionView(FULL, { project: 'Nope' }, NOW).attention).toMatchObject({
-      state: 'value',
-      total: 0,
-      items: [],
+      state: 'no_data',
+      reason: 'no project named "Nope" in this snapshot',
     });
+    expect(flowView(FULL, { project: 'Nope' }, NOW).flow).toMatchObject({ state: 'no_data' });
+    expect(metricsView(SPARSE, { project: 'Nope' }, NOW).metrics).toMatchObject({
+      state: 'no_data',
+    });
+    // Known through flow, with nothing waiting on the owner for it in the window: a real zero.
+    const known = attentionView(
+      FULL,
+      { project: 'Sample Orchard', since: '2026-01-14T00:00:00.000Z' },
+      NOW,
+    );
+    expect(known.attention).toMatchObject({ state: 'value', total: 0, items: [] });
   });
 
   it('labels a manual item', () => {
@@ -252,16 +286,24 @@ describe('metricsView', () => {
     });
   });
 
-  it('finds a project by any case, and answers sixteen no_data cells for an unknown one', () => {
+  it('finds a project by any case, and answers sixteen no_data cells for a known project with no metrics', () => {
     if (SPARSE.snapshot.metrics.state !== 'value') throw new Error('expected a value');
     const name = SPARSE.snapshot.metrics.projects[0]!.project;
     const known = metricsView(SPARSE, { project: name.toUpperCase() }, NOW);
     if (known.metrics.state !== 'value') throw new Error('expected a value');
     expect(known.metrics.projects.map((p) => p.project)).toEqual([name]);
-    const unknown = metricsView(SPARSE, { project: 'Nope' }, NOW);
-    if (unknown.metrics.state !== 'value') throw new Error('expected a value');
-    expect(unknown.metrics.projects).toHaveLength(1);
-    expect(unknown.metrics.projects[0]!.metrics.every((c) => c.state === 'no_data')).toBe(true);
+    // A project the snapshot knows (here through an attention item) but reports no metrics for.
+    const json = structuredClone(sparse) as typeof sparse;
+    json.attention.candidates.push({
+      ...json.attention.candidates[0]!,
+      id: 'other-1',
+      project: 'Other',
+    });
+    const unscored = metricsView(loaded(json), { project: 'other' }, NOW);
+    if (unscored.metrics.state !== 'value') throw new Error('expected a value');
+    expect(unscored.metrics.projects.map((p) => p.project)).toEqual(['other']);
+    expect(unscored.metrics.projects[0]!.metrics).toHaveLength(16);
+    expect(unscored.metrics.projects[0]!.metrics.every((c) => c.state === 'no_data')).toBe(true);
   });
 
   it('keeps only points since the bound, and a metric with none left is no_data', () => {

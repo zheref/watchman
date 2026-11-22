@@ -10,6 +10,7 @@ export * from './metrics';
 export * from './gaps';
 export * from './adapters/source';
 export * from './adapters/file';
+export * from './adapters/snapshot-source';
 export * from './adapters/gh';
 export * from './adapters/exclusions';
 export * from './adapters/github';

@@ -1,5 +1,6 @@
 import {
   ATTENTION_LIMIT,
+  combineProvenance,
   countNotYetEligible,
   isAtOrAfter,
   matchesProject,
@@ -19,6 +20,7 @@ import {
   type NoData,
   type ProviderSpend,
   type SectionKey,
+  type Snapshot,
 } from '@watchman/core';
 import type { LoadedSnapshot } from './snapshot';
 import type { AttentionOutput, FlowOutput, MetricsOutput, SpendOutput } from './schemas';
@@ -28,6 +30,10 @@ import type { AttentionOutput, FlowOutput, MetricsOutput, SpendOutput } from './
  * inputs always give the same JSON, which is what CONTRACT.md's examples and the tests rely on.
  * Each narrows only what carries a project or a date, and says so where something cannot be
  * narrowed (the board, spend per project) instead of guessing.
+ *
+ * A section's stamp, and so the response's top-level `source` and `as_of`, is the combined
+ * provenance of every record behind its figures (core's `combineProvenance`, as the web app's
+ * tiles use): every source named, the oldest `as_of`, and `manual` when any part was typed in.
  */
 
 export interface ResolvedFilter {
@@ -67,7 +73,7 @@ function envelope(loaded: LoadedSnapshot, key: SectionKey, filter: ResolvedFilte
     evaluated_at: now.toISOString(),
     snapshot: {
       origin: loaded.origin,
-      file: loaded.file,
+      file: loaded.source,
       generated_at: snapshot.generated_at,
       ...(loaded.skipped.length > 0 ? { skipped: loaded.skipped } : {}),
     },
@@ -77,6 +83,44 @@ function envelope(loaded: LoadedSnapshot, key: SectionKey, filter: ResolvedFilte
     },
     ...(gaps.length > 0 ? { gaps } : {}),
   };
+}
+
+/**
+ * Every project name the snapshot mentions anywhere: attention candidates, flow projects and work
+ * items, metrics projects. A project filter naming none of them is not "nothing open" but "no
+ * such project", so the views answer `no_data` for it rather than zeros.
+ */
+export function knownProjects(snapshot: Snapshot): Set<string> {
+  const names: string[] = [];
+  if (snapshot.attention.state === 'value')
+    names.push(...snapshot.attention.candidates.map((c) => c.project));
+  if (snapshot.flow.state === 'value') {
+    names.push(...snapshot.flow.projects.map((p) => p.project));
+    names.push(...snapshot.flow.work_items.map((w) => w.project));
+  }
+  if (snapshot.metrics.state === 'value')
+    names.push(...snapshot.metrics.projects.map((p) => p.project));
+  return new Set(names.map(normalizeProject));
+}
+
+/** The `no_data` a section answers for a project the snapshot does not know, or `null`. */
+function unknownProject(
+  loaded: LoadedSnapshot,
+  filter: ResolvedFilter,
+  section: Provenanced,
+): NoData | null {
+  if (filter.project === undefined) return null;
+  if (knownProjects(loaded.snapshot).has(normalizeProject(filter.project))) return null;
+  return noData(
+    `no project named ${JSON.stringify(filter.project)} in this snapshot`,
+    section.source,
+    section.as_of,
+  );
+}
+
+/** The response's top-level stamp is its section's. */
+function topLevel(record: Provenanced): { source: string; as_of: string } {
+  return { source: record.source, as_of: record.as_of };
 }
 
 // --- get_attention -------------------------------------------------------------------------------
@@ -90,15 +134,19 @@ export function attentionView(
   const base = envelope(loaded, 'attention', filter, now);
   const section = loaded.snapshot.attention;
   if (section.state === 'no_data') return { ...base, attention: section };
+  const unknown = unknownProject(loaded, filter, section);
+  if (unknown !== null) return { ...base, attention: unknown };
   const candidates = section.candidates.filter(
     (c) => matchesProject(c.project, filter.project) && isAtOrAfter(c.waiting_since, filter.since),
   );
   const ranked = rankAttention(candidates, now, { limit: candidates.length });
+  const sectionStamp = combineProvenance([section, ...ranked]);
   return {
     ...base,
+    ...topLevel(sectionStamp),
     attention: {
       state: 'value',
-      ...stamp(section),
+      ...sectionStamp,
       total: ranked.length,
       not_yet_due: countNotYetEligible(candidates, now),
       items: ranked.slice(0, limit).map((item) => ({
@@ -126,6 +174,8 @@ export function flowView(loaded: LoadedSnapshot, filter: ResolvedFilter, now: Da
   const { snapshot } = loaded;
   const section = snapshot.flow;
   if (section.state === 'no_data') return { ...base, flow: section };
+  const unknown = unknownProject(loaded, filter, section);
+  if (unknown !== null) return { ...base, flow: unknown };
   const projects = section.projects.filter((p) => matchesProject(p.project, filter.project));
   const projectItems = section.work_items.filter((w) => matchesProject(w.project, filter.project));
   const since = filter.since;
@@ -137,11 +187,19 @@ export function flowView(loaded: LoadedSnapshot, filter: ResolvedFilter, now: Da
       (w.completed_at !== undefined && isAtOrAfter(w.completed_at, since)),
   );
   const weekOptions = { utcOffsetMinutes: snapshot.utc_offset_minutes ?? 0 };
+  const showBoard = filter.project === undefined && section.board.state === 'value';
+  const sectionStamp = combineProvenance([
+    section,
+    ...projects,
+    ...projectItems,
+    ...(showBoard ? [section.board] : []),
+  ]);
   return {
     ...base,
+    ...topLevel(sectionStamp),
     flow: {
       state: 'value',
-      ...stamp(section),
+      ...sectionStamp,
       totals: flowTotals(projects),
       projects: projects.map((p) => ({
         project: p.project,
@@ -218,15 +276,23 @@ export function spendView(loaded: LoadedSnapshot, filter: ResolvedFilter, now: D
         : p.monthly_cost,
   }));
   const month = monthOf(now, snapshot.utc_offset_minutes ?? 0);
+  const total = monthlySpendTotal(providers, month, section.as_of);
+  const quotas = providers.map((p) => quotaStatus(p.quota, now));
+  const sectionStamp = combineProvenance([
+    section,
+    ...quotas.filter((q) => q.state === 'value'),
+    ...(total.state === 'value' ? [total] : []),
+  ]);
   return {
     ...base,
+    ...topLevel(sectionStamp),
     spend: {
       state: 'value',
-      ...stamp(section),
+      ...sectionStamp,
       month,
-      total: monthlySpendTotal(providers, month, now.toISOString()),
-      providers: providers.map((p) => {
-        const quota = quotaStatus(p.quota, now);
+      total,
+      providers: providers.map((p, index) => {
+        const quota = quotas[index]!;
         const cost = p.monthly_cost;
         return {
           id: p.id,
@@ -266,8 +332,10 @@ export function metricsView(
   const base = envelope(loaded, 'metrics', filter, now);
   const section = loaded.snapshot.metrics;
   if (section.state === 'no_data') return { ...base, metrics: section };
-  // With a project filter, the one project asked for — by its reported name when it is known —
-  // even when nothing is reported for it, so the answer is sixteen explicit no-data cells.
+  const unknown = unknownProject(loaded, filter, section);
+  if (unknown !== null) return { ...base, metrics: unknown };
+  // With a project filter, the one project asked for — by its reported name when it has metrics —
+  // even when the snapshot knows it but reports no metrics for it: sixteen explicit no-data cells.
   const names =
     filter.project === undefined
       ? section.projects.map((p) => p.project)
@@ -277,50 +345,57 @@ export function metricsView(
           )?.project ?? filter.project,
         ];
   const since = filter.since;
+  const projects = names.map((project) => ({
+    project,
+    metrics: metricCells(section, project).map(({ name, series }): MetricCell => {
+      if (series.state === 'no_data') {
+        return {
+          name,
+          state: 'no_data',
+          reason: series.reason,
+          source: series.source,
+          as_of: series.as_of,
+        };
+      }
+      const points = series.points
+        .filter((p) => isAtOrAfter(p.at, since))
+        .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+      if (points.length === 0) {
+        return {
+          name,
+          state: 'no_data',
+          reason: `no ${name} points at or after ${since}`,
+          source: series.source,
+          as_of: series.as_of,
+        };
+      }
+      // A value series with at least one point always has a trend.
+      const trend = metricTrend({ ...series, points }) as MetricTrend;
+      return {
+        name,
+        state: 'value',
+        ...(series.unit !== undefined ? { unit: series.unit } : {}),
+        latest: trend.latest,
+        previous: trend.previous,
+        delta: trend.delta,
+        latest_at: trend.latest_at,
+        points,
+        ...stamp(series),
+      };
+    }),
+  }));
+  const reported = projects.flatMap((p) =>
+    p.metrics.filter((m): m is Extract<MetricCell, { state: 'value' }> => m.state === 'value'),
+  );
+  const sectionStamp = combineProvenance([section, ...reported]);
   return {
     ...base,
-    metrics: {
-      state: 'value',
-      ...stamp(section),
-      projects: names.map((project) => ({
-        project,
-        metrics: metricCells(section, project).map(({ name, series }) => {
-          if (series.state === 'no_data') {
-            return {
-              name,
-              state: 'no_data',
-              reason: series.reason,
-              source: series.source,
-              as_of: series.as_of,
-            };
-          }
-          const points = series.points
-            .filter((p) => isAtOrAfter(p.at, since))
-            .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
-          if (points.length === 0) {
-            return {
-              name,
-              state: 'no_data',
-              reason: `no ${name} points at or after ${since}`,
-              source: series.source,
-              as_of: series.as_of,
-            };
-          }
-          // A value series with at least one point always has a trend.
-          const trend = metricTrend({ ...series, points }) as MetricTrend;
-          return {
-            name,
-            state: 'value',
-            ...(series.unit !== undefined ? { unit: series.unit } : {}),
-            latest: trend.latest,
-            previous: trend.previous,
-            delta: trend.delta,
-            latest_at: trend.latest_at,
-            points,
-            ...stamp(series),
-          };
-        }),
-      })),
-    },
+    ...topLevel(sectionStamp),
+    metrics: { state: 'value', ...sectionStamp, projects },
   };
 }
+
+type MetricCell = Extract<
+  MetricsOutput['metrics'],
+  { state: 'value' }
+>['projects'][number]['metrics'][number];

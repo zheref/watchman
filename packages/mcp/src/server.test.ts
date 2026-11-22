@@ -1,12 +1,15 @@
 import { Client } from '@modelcontextprotocol/client';
+import { FilterError } from '@watchman/core';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import pkg from '../package.json' with { type: 'json' };
 import {
+  FAILURE_MESSAGE,
   READ_ONLY_ANNOTATIONS,
   SERVER_VERSION,
   TOOL_NAMES,
   createWatchmanServer,
+  describeError,
   resolveFilter,
   type ServerDeps,
 } from './server';
@@ -111,21 +114,41 @@ describe('tool calls', () => {
     expect(result.isError).toBe(true);
   });
 
-  it('reports a failed read without leaking its message', async () => {
-    const client = await connect({ load: () => Promise.reject(new Error('EACCES /secret/path')) });
+  it('reports an unexpected failure without leaking it, and logs it for the operator', async () => {
+    const logged: string[] = [];
+    const client = await connect({
+      load: () =>
+        Promise.reject(Object.assign(new Error('EACCES /secret/path'), { code: 'EACCES' })),
+      log: (m) => logged.push(m),
+    });
     const result = await client.callTool({ name: 'get_metrics', arguments: {} });
     expect(result.isError).toBe(true);
-    expect(JSON.stringify(result.content)).toContain('the snapshot could not be read');
+    expect(JSON.stringify(result.content)).toContain(FAILURE_MESSAGE);
     expect(JSON.stringify(result.content)).not.toContain('/secret/path');
+    // The operator gets the class and code; the message, which can carry a path, goes nowhere.
+    expect(logged).toEqual(['tool call failed: Error (EACCES)']);
   });
 
-  it("passes a core RangeError's own message through", async () => {
-    const client = await connect({
-      load: () => Promise.reject(new RangeError('window must be at most 366d, got 9999d')),
-    });
-    const result = await client.callTool({ name: 'get_flow', arguments: {} });
+  it('reports a non-Error failure, with no logger configured', async () => {
+    const client = await connect({ load: () => Promise.reject('boom') });
+    const result = await client.callTool({ name: 'get_spend', arguments: {} });
     expect(result.isError).toBe(true);
-    expect(JSON.stringify(result.content)).toContain('at most 366d');
+    expect(JSON.stringify(result.content)).toContain(FAILURE_MESSAGE);
+  });
+
+  it("passes core's FilterError message through, and no other RangeError's", async () => {
+    const filter = await connect({
+      load: () => Promise.reject(new FilterError('window must be at most 366d, got 9999d')),
+    });
+    const ok = await filter.callTool({ name: 'get_flow', arguments: {} });
+    expect(ok.isError).toBe(true);
+    expect(JSON.stringify(ok.content)).toContain('at most 366d');
+    const other = await connect({
+      load: () => Promise.reject(new RangeError('Invalid time value /secret/path')),
+    });
+    const hidden = await other.callTool({ name: 'get_flow', arguments: {} });
+    expect(JSON.stringify(hidden.content)).toContain(FAILURE_MESSAGE);
+    expect(JSON.stringify(hidden.content)).not.toContain('/secret/path');
   });
 });
 
@@ -136,5 +159,14 @@ describe('resolveFilter', () => {
       project: 'A',
       since: '2026-01-13T15:00:00.000Z',
     });
+  });
+});
+
+describe('describeError', () => {
+  it('names the class and a well-formed code only', () => {
+    expect(describeError(new TypeError('x /a/b'))).toBe('TypeError');
+    expect(describeError(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBe('Error (ENOENT)');
+    expect(describeError(Object.assign(new Error('x'), { code: '/a/b' }))).toBe('Error');
+    expect(describeError('text')).toBe('string');
   });
 });

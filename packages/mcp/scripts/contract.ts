@@ -53,7 +53,7 @@ export const EXAMPLES: readonly Example[] = [
 const SPARSE: LoadedSnapshot = {
   snapshot: assertSnapshot(sparse, 'sparse.json'),
   origin: 'file',
-  file: 'file:snapshot-2026-01-14T15-00-00Z.json',
+  source: 'file:snapshot-2026-01-14T15-00-00Z.json',
   skipped: [],
 };
 
@@ -143,20 +143,37 @@ export async function renderContract(current: string): Promise<string> {
   return format(filled, { ...options, filepath: CONTRACT_PATH });
 }
 
-async function run(): Promise<void> {
-  const current = await readFile(CONTRACT_PATH, 'utf8');
+export interface RunIo {
+  argv: readonly string[];
+  /** The contract file; CONTRACT.md by default. */
+  path?: string;
+  report: (line: string) => void;
+}
+
+/**
+ * Checks the contract file (exit code 1 when it is out of date), or rewrites it with `--write`.
+ * Returns the exit code.
+ */
+export async function run(io: RunIo): Promise<number> {
+  const path = io.path ?? CONTRACT_PATH;
+  const current = await readFile(path, 'utf8');
   const next = await renderContract(current);
-  if (process.argv.includes('--write')) {
-    await writeFile(CONTRACT_PATH, next);
-    process.stderr.write(next === current ? 'CONTRACT.md is current\n' : 'CONTRACT.md rewritten\n');
-  } else if (next !== current) {
-    process.stderr.write(
-      'CONTRACT.md is out of date: run npm run contract --workspace @watchman/mcp\n',
-    );
-    process.exitCode = 1;
+  if (io.argv.includes('--write')) {
+    await writeFile(path, next);
+    io.report(next === current ? 'CONTRACT.md is current' : 'CONTRACT.md rewritten');
+    return 0;
   }
+  if (next !== current) {
+    io.report('CONTRACT.md is out of date: run npm run contract --workspace @watchman/mcp');
+    return 1;
+  }
+  io.report('CONTRACT.md is current');
+  return 0;
 }
 
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1]) {
-  await run();
+  process.exitCode = await run({
+    argv: process.argv.slice(2),
+    report: (line) => process.stderr.write(`${line}\n`),
+  });
 }

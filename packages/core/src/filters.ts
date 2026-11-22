@@ -14,15 +14,26 @@ export const MAX_WINDOW_DAYS = 366;
 
 const UNIT_MS = { h: HOUR_MS, d: DAY_MS, w: 7 * DAY_MS } as const;
 
-/** A window's length in milliseconds. Throws a `RangeError` on anything but `<n>h|d|w` in range. */
+/**
+ * A filter the caller gave cannot be used. Its message is written here and names only the value
+ * the caller sent, so a server may hand it back to that caller; any other error may not be.
+ */
+export class FilterError extends RangeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FilterError';
+  }
+}
+
+/** A window's length in milliseconds. Throws a {@link FilterError} on anything but `<n>h|d|w` in range. */
 export function parseWindow(window: string): number {
   const match = WINDOW_PATTERN.exec(window);
   if (match === null) {
-    throw new RangeError(`window must look like 48h, 7d or 2w, got ${JSON.stringify(window)}`);
+    throw new FilterError(`window must look like 48h, 7d or 2w, got ${JSON.stringify(window)}`);
   }
   const ms = Number(match[1]) * UNIT_MS[match[2] as keyof typeof UNIT_MS];
   if (ms > MAX_WINDOW_DAYS * DAY_MS) {
-    throw new RangeError(`window must be at most ${MAX_WINDOW_DAYS}d, got ${window}`);
+    throw new FilterError(`window must be at most ${MAX_WINDOW_DAYS}d, got ${window}`);
   }
   return ms;
 }
@@ -36,11 +47,20 @@ export interface TimeFilterInput {
 
 /**
  * The effective lower bound, as an ISO 8601 UTC string, or `undefined` when neither is given.
- * With both, the later bound wins, so the result honours each of them.
+ * With both, the later bound wins, so the result honours each of them. Throws a
+ * {@link FilterError} on a bad `since` or `window`.
  */
 export function resolveSince(input: TimeFilterInput, now: Date): string | undefined {
   const bounds: number[] = [];
-  if (input.since !== undefined) bounds.push(toMillis(input.since));
+  if (input.since !== undefined) {
+    const since = Date.parse(input.since);
+    if (Number.isNaN(since)) {
+      throw new FilterError(
+        `since must be an ISO 8601 date-time, got ${JSON.stringify(input.since)}`,
+      );
+    }
+    bounds.push(since);
+  }
   if (input.window !== undefined) bounds.push(now.getTime() - parseWindow(input.window));
   if (bounds.length === 0) return undefined;
   return new Date(Math.max(...bounds)).toISOString();

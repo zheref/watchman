@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FilterError,
   MAX_WINDOW_DAYS,
   isAtOrAfter,
   matchesProject,
@@ -54,9 +55,19 @@ describe('resolveSince', () => {
     );
   });
 
-  it('refuses a bad since or window', () => {
-    expect(() => resolveSince({ since: 'yesterday' }, NOW)).toThrow(RangeError);
-    expect(() => resolveSince({ window: 'a week' }, NOW)).toThrow(RangeError);
+  it('refuses a bad since or window with a FilterError naming the value', () => {
+    expect(() => resolveSince({ since: 'yesterday' }, NOW)).toThrow(FilterError);
+    expect(() => resolveSince({ since: 'yesterday' }, NOW)).toThrow(/"yesterday"/);
+    expect(() => resolveSince({ window: 'a week' }, NOW)).toThrow(FilterError);
+    const error = (() => {
+      try {
+        parseWindow('0d');
+      } catch (e) {
+        return e;
+      }
+    })();
+    expect(error).toBeInstanceOf(RangeError);
+    expect((error as Error).name).toBe('FilterError');
   });
 });
 

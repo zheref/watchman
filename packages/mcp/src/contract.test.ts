@@ -1,6 +1,8 @@
-import { readFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CONTRACT_PATH, fillBlocks, renderContract } from '../scripts/contract';
+import { CONTRACT_PATH, fillBlocks, renderContract, run } from '../scripts/contract';
 import { TOOL_NAMES } from './server';
 
 /**
@@ -28,5 +30,33 @@ describe('CONTRACT.md', () => {
     expect(fillBlocks('<!-- BEGIN GENERATED: a -->\nold\n<!-- END GENERATED -->', blocks)).toBe(
       '<!-- BEGIN GENERATED: a -->\nA\n<!-- END GENERATED -->',
     );
+  });
+
+  it('checks, refuses a stale copy, and rewrites it with --write', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'watchman-contract-'));
+    const path = join(dir, 'CONTRACT.md');
+    const lines: string[] = [];
+    const report = (line: string) => lines.push(line);
+    try {
+      await copyFile(CONTRACT_PATH, path);
+      expect(await run({ argv: [], path, report })).toBe(0);
+      const current = await readFile(path, 'utf8');
+      await writeFile(
+        path,
+        current.replace('"additionalProperties": false', '"additionalProperties": true'),
+      );
+      expect(await run({ argv: [], path, report })).toBe(1);
+      expect(await run({ argv: ['--write'], path, report })).toBe(0);
+      expect(await readFile(path, 'utf8')).toBe(current);
+      expect(await run({ argv: ['--write'], path, report })).toBe(0);
+      expect(lines).toEqual([
+        'CONTRACT.md is current',
+        'CONTRACT.md is out of date: run npm run contract --workspace @watchman/mcp',
+        'CONTRACT.md rewritten',
+        'CONTRACT.md is current',
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

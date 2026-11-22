@@ -1,86 +1,63 @@
-import { SECTION_KEYS, type SnapshotDirReader } from '@watchman/core';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { SnapshotDirReader } from '@watchman/core';
 import full from '@watchman/core/fixtures/synthetic/full.json' with { type: 'json' };
 import { describe, expect, it } from 'vitest';
-import { FIXTURE_SOURCE, loadSnapshot, unavailableSnapshot } from './snapshot';
+import { FIXTURE_SOURCE, loadSnapshot } from './snapshot';
+
+/**
+ * The server's loader is core's `resolveSnapshotSource` (tested there in full) with the fixture
+ * and Node's file system plugged in; these check the plugging.
+ */
 
 const NOW = new Date('2026-01-14T16:00:00Z');
 
-const memory = (files: Record<string, string>, listError?: Error): SnapshotDirReader => ({
-  list: () => (listError ? Promise.reject(listError) : Promise.resolve(Object.keys(files))),
-  readText: (path) => {
-    const text = files[path.split('/').pop()!];
-    return text === undefined
-      ? Promise.reject(Object.assign(new Error(`ENOENT ${path}`), { code: 'ENOENT' }))
-      : Promise.resolve(text);
-  },
+const memory = (files: Record<string, string>): SnapshotDirReader => ({
+  list: () => Promise.resolve(Object.keys(files)),
+  readText: (path) => Promise.resolve(files[path.split('/').pop()!]!),
 });
 
 describe('loadSnapshot', () => {
-  it('serves the labelled synthetic fixture when WATCHMAN_SNAPSHOT_DIR is unset or blank', async () => {
-    for (const env of [{}, { WATCHMAN_SNAPSHOT_DIR: '  ' }]) {
-      const loaded = await loadSnapshot(env, NOW, memory({}));
-      expect(loaded).toMatchObject({
-        origin: 'synthetic-fixture',
-        file: FIXTURE_SOURCE,
-        skipped: [],
-      });
-      expect(loaded.snapshot.synthetic).toBe(true);
-    }
+  it('serves the committed synthetic fixture when WATCHMAN_SNAPSHOT_DIR is unset', async () => {
+    const loaded = await loadSnapshot({}, NOW);
+    expect(loaded).toMatchObject({ origin: 'synthetic-fixture', source: FIXTURE_SOURCE });
+    expect(loaded.snapshot.synthetic).toBe(true);
+    expect(loaded.snapshot.generated_at).toBe(full.generated_at);
   });
 
-  it('reads the newest usable snapshot in the directory, naming files only', async () => {
+  it('reads the directory through the reader it is given', async () => {
     const loaded = await loadSnapshot(
       { WATCHMAN_SNAPSHOT_DIR: '/data/watchman' },
       NOW,
-      memory({
-        'snapshot-2026-01-14T14-00-00Z.json': JSON.stringify(full),
-        'snapshot-2026-01-14T15-00-00Z.json': '{ truncated',
-      }),
+      memory({ 'snapshot-2026-01-14T14-00-00Z.json': JSON.stringify(full) }),
     );
-    expect(loaded.origin).toBe('file');
-    expect(loaded.file).toBe('file:snapshot-2026-01-14T14-00-00Z.json');
-    expect(loaded.skipped).toEqual([
-      {
-        source: 'file:snapshot-2026-01-14T15-00-00Z.json',
-        problem: expect.stringMatching(/not valid JSON/),
-      },
-    ]);
-    expect(JSON.stringify(loaded)).not.toContain('/data/watchman');
-  });
-
-  it('never falls back to the fixture: an unreadable directory is no_data everywhere', async () => {
-    const loaded = await loadSnapshot(
-      { WATCHMAN_SNAPSHOT_DIR: '/data/watchman' },
-      NOW,
-      memory({}, Object.assign(new Error('EACCES /data/watchman'), { code: 'EACCES' })),
-    );
-    expect(loaded).toMatchObject({ origin: 'unavailable', file: 'snapshot directory' });
-    for (const key of SECTION_KEYS) {
-      expect(loaded.snapshot[key]).toMatchObject({
-        state: 'no_data',
-        reason: expect.stringMatching(/EACCES/),
-      });
-    }
-    expect(loaded.snapshot.synthetic).toBeUndefined();
-    expect(JSON.stringify(loaded)).not.toContain('/data/watchman');
-  });
-
-  it('reads a real directory with the default Node reader', async () => {
-    const loaded = await loadSnapshot({ WATCHMAN_SNAPSHOT_DIR: '/nonexistent-watchman-dir' }, NOW);
-    expect(loaded.origin).toBe('unavailable');
-    expect(loaded.snapshot.flow).toMatchObject({ reason: expect.stringMatching(/ENOENT/) });
-  });
-});
-
-describe('unavailableSnapshot', () => {
-  it('stamps every section no_data at now', () => {
-    const snapshot = unavailableSnapshot('gone', NOW);
-    expect(snapshot.generated_at).toBe(NOW.toISOString());
-    expect(snapshot.metrics).toEqual({
-      state: 'no_data',
-      reason: 'gone',
-      source: 'watchman',
-      as_of: NOW.toISOString(),
+    expect(loaded).toMatchObject({
+      origin: 'file',
+      source: 'file:snapshot-2026-01-14T14-00-00Z.json',
     });
+  });
+
+  it("reads a real directory with Node's file system by default, path-free on failure", async () => {
+    const loaded = await loadSnapshot({ WATCHMAN_SNAPSHOT_DIR: '/nonexistent-watchman-dir' }, NOW);
+    expect(loaded).toMatchObject({
+      origin: 'unavailable',
+      problem: expect.stringMatching(/ENOENT/),
+    });
+    expect(JSON.stringify(loaded)).not.toContain('/nonexistent-watchman-dir');
+  });
+
+  it("reads a real snapshot file with Node's file system", async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'watchman-mcp-snapshot-'));
+    try {
+      await writeFile(join(dir, 'snapshot-2026-01-14T15-00-00Z.json'), JSON.stringify(full));
+      const loaded = await loadSnapshot({ WATCHMAN_SNAPSHOT_DIR: dir }, NOW);
+      expect(loaded).toMatchObject({
+        origin: 'file',
+        source: 'file:snapshot-2026-01-14T15-00-00Z.json',
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

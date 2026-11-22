@@ -1,4 +1,5 @@
-import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { copyFile, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -177,7 +178,65 @@ describe('watchman-mcp over stdio, snapshot directory', () => {
 });
 
 describe('watchman-mcp startup', () => {
-  it('refuses any transport but stdio', async () => {
-    await expect(connect({ WATCHMAN_MCP_TRANSPORT: 'http' })).rejects.toThrow();
+  it.each([
+    [
+      { WATCHMAN_MCP_TRANSPORT: 'http' },
+      /WATCHMAN_MCP_TRANSPORT="http" is not supported; only stdio is/,
+    ],
+    [{ WATCHMAN_MCP_NOW: 'soon' }, /WATCHMAN_MCP_NOW must be an ISO 8601 date-time/],
+  ])(
+    'refuses to start with %j: exit 1, the reason on stderr, nothing on stdout',
+    async (env, reason) => {
+      const run = spawnSync(process.execPath, [BIN], {
+        env: { ...getDefaultEnvironment(), ...env },
+        input: '',
+        encoding: 'utf8',
+        timeout: 20_000,
+      });
+      expect(run.status).toBe(1);
+      expect(run.stderr).toMatch(reason);
+      expect(run.stdout).toBe('');
+    },
+    30_000,
+  );
+});
+
+describe('watchman-mcp launched from a hostile working directory', () => {
+  let cwd: string;
+
+  beforeAll(async () => {
+    // A directory a client might launch the server from, whose tsconfig remaps the server's
+    // imports to planted code. tsx must ignore it, and must leave no transform cache behind.
+    cwd = await mkdtemp(join(tmpdir(), 'watchman-mcp-hostile-'));
+    await writeFile(
+      join(cwd, 'tsconfig.json'),
+      JSON.stringify({ compilerOptions: { paths: { '@watchman/core': ['./planted.ts'] } } }),
+    );
+    await writeFile(join(cwd, 'package.json'), JSON.stringify({ type: 'module' }));
+    await writeFile(
+      join(cwd, 'planted.ts'),
+      "process.stderr.write('PLANTED\\n');\nprocess.exit(7);\n",
+    );
+  });
+
+  afterAll(async () => {
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it('loads its own modules and writes no cache', async () => {
+    const run = spawnSync(process.execPath, [BIN], {
+      cwd,
+      env: {
+        ...getDefaultEnvironment(),
+        TMPDIR: cwd,
+        TSX_TSCONFIG_PATH: join(cwd, 'tsconfig.json'),
+      },
+      input: '',
+      encoding: 'utf8',
+      timeout: 20_000,
+    });
+    expect(run.stderr).not.toContain('PLANTED');
+    expect(run.status).toBe(0);
+    expect((await readdir(cwd)).sort()).toEqual(['package.json', 'planted.ts', 'tsconfig.json']);
   }, 30_000);
 });
