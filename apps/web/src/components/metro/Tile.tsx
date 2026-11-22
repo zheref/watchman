@@ -34,7 +34,7 @@ export interface TileProps {
   href?: string;
   /** A short badge top-right, e.g. "manual" or "partial". */
   badge?: string;
-  /** Position in the grid, used to stagger the entrance animation. */
+  /** Position in the grid, used to stagger the entrance animation (capped at 300 ms). */
   index?: number;
   /** Heading level of the title within the page; 2 by default. */
   headingLevel?: 2 | 3;
@@ -73,7 +73,7 @@ export function Tile({
       data-part="root"
       data-size={size}
       data-state={missing ? 'no-data' : 'value'}
-      style={{ animationDelay: `${Math.min(index, 12) * 60}ms` }}
+      style={{ animationDelay: `${Math.min(index, 5) * 60}ms` }}
     >
       <chakra.div css={styles.header}>
         <Heading id={titleId} css={styles.title} data-part="title" m="0">

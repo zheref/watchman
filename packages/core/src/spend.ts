@@ -125,9 +125,10 @@ export function monthlySpendTotal(
   };
 }
 
-/** `YYYY-MM` of `now` in UTC. */
-export function monthOf(now: Date): string {
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+/** `YYYY-MM` of `now` in the owner's calendar: UTC shifted by `utcOffsetMinutes` (0 by default). */
+export function monthOf(now: Date, utcOffsetMinutes = 0): string {
+  const local = new Date(now.getTime() + utcOffsetMinutes * 60 * 1000);
+  return `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 /** `1234.5` → `$1,234.50`; `80000` → `COP 80,000`. Fixed `en-US` grouping on every surface. */

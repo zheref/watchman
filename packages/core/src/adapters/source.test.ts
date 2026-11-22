@@ -106,16 +106,33 @@ describe('collectSnapshot', () => {
     ).rejects.toThrow('duplicate source adapter id: x');
   });
 
-  it('refuses an adapter report that would not validate', async () => {
-    const bad = adapter('bad', {
-      source: 'bad',
+  it('sets aside a report that would not validate, keeping the others', async () => {
+    const late = adapter('late', {
+      source: 'late',
       as_of: AS_OF,
-      sections: { attention: attention('bad', AS_OF, ['a']) },
+      sections: { attention: attention('late', '2026-01-14T16:00:00Z', ['x']) },
     });
-    // A report stamped later than the collection instant cannot be trusted.
-    await expect(collectSnapshot([bad], { now: new Date('2026-01-14T13:00:00Z') })).rejects.toThrow(
-      /invalid collected snapshot/,
+    const broken = adapter('broken', {
+      source: 'broken',
+      as_of: AS_OF,
+      sections: { flow: { state: 'value' } as never },
+    });
+    const badStamp = adapter('bad-stamp', { source: 'b', as_of: 'yesterday', sections: {} });
+    const good = adapter('good', {
+      source: 'good',
+      as_of: AS_OF,
+      sections: { attention: attention('good', AS_OF, ['a']) },
+    });
+    const { snapshot, failures } = await collectSnapshot([late, broken, badStamp, good], {
+      now: NOW,
+    });
+    expect(failures.map((f) => f.adapter)).toEqual(['late', 'broken', 'bad-stamp']);
+    expect(failures[0]?.message).toMatch(
+      /^invalid report: attention\.as_of: as_of 2026-01-14T16:00:00Z is later than/,
     );
+    expect(failures[1]?.message).toMatch(/^invalid report: flow is invalid/);
+    expect(failures[2]?.message).toMatch(/not an ISO 8601 date-time: yesterday/);
+    expect(snapshot.attention).toMatchObject({ state: 'value', source: 'good' });
   });
 });
 

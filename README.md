@@ -55,12 +55,24 @@ Everything the dashboard shows comes from one versioned document, the **snapshot
 - Every figure lives in a record that carries its `source` and `as_of` (ISO 8601 with an offset).
   A record that could not be observed is an explicit `{ "state": "no_data", "reason": … }` record,
   never a zero or a placeholder. Hand-typed figures carry `"manual": true`.
-- `parseSnapshot` validates untrusted input (unknown versions, keys and non-`https` links are
-  refused); `collectSnapshot` runs the configured **source adapters** and merges their reports.
+- `parseSnapshot` validates untrusted input: unknown versions and keys, non-`https` links, links
+  carrying credentials, and stamps later than the snapshot are refused. `collectSnapshot` runs the
+  configured **source adapters**, validates each report, and merges the valid ones. An adapter that
+  fails or reports something invalid is listed in `failures`; that list is how a caller knows a
+  merged section may be incomplete.
+- A figure combined from several records (a total, a count across projects) carries their
+  combined stamp: the **oldest** `as_of`, every source, and `manual` if any part was typed in.
+- Week and month boundaries are UTC unless the caller passes the owner's `utcOffsetMinutes`.
 - The only adapter today reads a snapshot file from the directory in `WATCHMAN_SNAPSHOT_DIR`
   (server-side only, no default; see `apps/web/src/server/snapshot.ts`). Unset means "no data".
-- Synthetic fixtures live in `packages/core/fixtures/synthetic/`; a test validates every one and
-  checks it is marked synthetic and links only to `example.com`.
+- Seven synthetic fixtures live in `packages/core/fixtures/synthetic/` (full, sparse, empty, mixed
+  stamps, overflow, past reset, manual only). They are for tests and the `/theme` preview only; a
+  test validates every one and checks it is marked synthetic and links only to `example.com`.
+
+Two choices here differ from the `react-uzf-v1` handbook and are part of the ruling tracked in #8:
+`packages/core` depends on `zod` (framework-free) for runtime validation, beyond RC-50's
+allowlist; and the versioned snapshot document is both the wire format and the domain type that
+consumers read (UZF-17 separates the two), because the document is itself the product's contract.
 
 The stack handbook this repository resolves is `react-uzf-v1`. Its monorepo topology (RC-49 to
 RC-51) differs from this layout (an MCP package, npm workspaces, no Redux or shared-UI tier); the

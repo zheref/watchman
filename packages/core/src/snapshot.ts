@@ -216,29 +216,34 @@ function formatPath(path: readonly PropertyKey[]): string {
   }, '');
 }
 
-/** Walks a parsed snapshot and reports every `as_of` that claims to be from its future. */
-function futureAsOfIssues(snapshot: Snapshot): SnapshotIssue[] {
-  const limit = Date.parse(snapshot.generated_at) + AS_OF_SKEW_MS;
-  const issues: SnapshotIssue[] = [];
-  const visit = (node: unknown, path: PropertyKey[]): void => {
-    if (Array.isArray(node)) {
-      node.forEach((child, index) => visit(child, [...path, index]));
-      return;
+/**
+ * Every `as_of` anywhere inside `node` that is later than `limitMs`, by path. Used for a whole
+ * snapshot (against its `generated_at`) and for one adapter report (against the collection time);
+ * `limitLabel` names the limit in each message.
+ */
+export function asOfLaterThan(
+  node: unknown,
+  limitMs: number,
+  limitLabel: string,
+  path: PropertyKey[] = [],
+): SnapshotIssue[] {
+  if (Array.isArray(node)) {
+    return node.flatMap((child, i) => asOfLaterThan(child, limitMs, limitLabel, [...path, i]));
+  }
+  if (node === null || typeof node !== 'object') return [];
+  return Object.entries(node).flatMap(([key, child]) => {
+    if (key !== 'as_of' || typeof child !== 'string') {
+      return asOfLaterThan(child, limitMs, limitLabel, [...path, key]);
     }
-    if (node === null || typeof node !== 'object') return;
-    for (const [key, child] of Object.entries(node)) {
-      if (key === 'as_of' && typeof child === 'string' && Date.parse(child) > limit) {
-        issues.push({
-          path: formatPath([...path, key]),
-          message: `as_of ${child} is later than generated_at ${snapshot.generated_at}`,
-        });
-      } else {
-        visit(child, [...path, key]);
-      }
-    }
-  };
-  visit(snapshot, []);
-  return issues;
+    return Date.parse(child) > limitMs
+      ? [
+          {
+            path: formatPath([...path, key]),
+            message: `as_of ${child} is later than ${limitLabel}`,
+          },
+        ]
+      : [];
+  });
 }
 
 /**
@@ -270,7 +275,8 @@ export function parseSnapshot(input: unknown): SnapshotParseResult {
       })),
     };
   }
-  const future = futureAsOfIssues(result.data);
+  const limit = Date.parse(result.data.generated_at) + AS_OF_SKEW_MS;
+  const future = asOfLaterThan(result.data, limit, `generated_at ${result.data.generated_at}`);
   if (future.length > 0) return { ok: false, issues: future };
   return { ok: true, snapshot: result.data };
 }

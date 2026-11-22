@@ -25,7 +25,7 @@ export const pivotRecipe = defineSlotRecipe({
       color: 'fg',
       _motionSafe: {
         animationName: 'metro-slide-in',
-        animationDuration: 'slower',
+        animationDuration: 'slow',
         animationTimingFunction: 'metro',
         animationFillMode: 'backwards',
       },
@@ -44,6 +44,7 @@ export const pivotRecipe = defineSlotRecipe({
       display: 'inline-flex',
       alignItems: 'center',
       minHeight: '11',
+      minWidth: '11',
       fontSize: { base: '2xl', md: '3xl' },
       fontWeight: 'light',
       textTransform: 'lowercase',

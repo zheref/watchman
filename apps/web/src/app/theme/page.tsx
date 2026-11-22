@@ -2,7 +2,7 @@ import { describeAge, formatAsOf, assertSnapshot } from '@watchman/core';
 import fixture from '@watchman/core/fixtures/synthetic/full.json';
 import type { Metadata } from 'next';
 import { PageShell, PivotHeader, Tile, TileGrid } from '@/components/metro';
-import { attentionView, flowView, metricsView, spendView } from '@/lib/tiles';
+import { attentionView, flowView, metricsView, plural, spendView } from '@/lib/tiles';
 import { ACCENTS, ACCENT_NAMES, TILE_FG, contrastRatio } from '@/theme/palette';
 import { Section, Specimen, TileList } from './parts';
 
@@ -17,11 +17,11 @@ const snapshot = assertSnapshot(fixture, 'synthetic fixture full.json');
 // same on every run (and in screenshots).
 const now = new Date(snapshot.generated_at);
 
+// The pivot moves between views; this page is the current one. Its sections are reached by
+// scrolling, as on a Modern UI panorama.
 const PIVOTS = [
-  { label: 'tiles', href: '#tiles' },
-  { label: 'states', href: '#states' },
-  { label: 'type', href: '#type' },
-  { label: 'palette', href: '#palette' },
+  { label: 'start', href: '/' },
+  { label: 'theme', href: '/theme', current: true },
 ];
 
 export default function ThemePreview() {
@@ -32,14 +32,7 @@ export default function ThemePreview() {
 
   return (
     <PageShell
-      header={
-        <PivotHeader
-          eyebrow="watchman · theme preview"
-          title="metro"
-          items={PIVOTS.map((p, i) => ({ ...p, current: i === 0 }))}
-          navLabel="Theme preview sections"
-        />
-      }
+      header={<PivotHeader eyebrow="watchman · theme preview" title="metro" items={PIVOTS} />}
       footer={
         <>
           Synthetic snapshot generated{' '}
@@ -97,14 +90,14 @@ export default function ThemePreview() {
               title="Flow"
               size="wide"
               accent="emerald"
-              value={flow.merged_this_week}
-              caption={`done this week · ${flow.merged_last_week} last week (${flow.delta >= 0 ? '+' : ''}${flow.delta})`}
+              value={flow.done_this_week}
+              caption={`done this week · ${flow.done_last_week} last week (${flow.delta >= 0 ? '+' : ''}${flow.delta})`}
               provenance={flow.stamp}
               index={1}
             >
               <Specimen as="p" textStyle="metro.caption" m="0">
-                {flow.open_prs} open PRs · {flow.open_issues} open issues · {flow.stale} stale over
-                3 days
+                {plural(flow.open_prs, 'open PR')} · {plural(flow.open_issues, 'open issue')} ·{' '}
+                {flow.stale} stale over {flow.stale_after_days} days
               </Specimen>
             </Tile>
           )}
@@ -126,9 +119,11 @@ export default function ThemePreview() {
               caption={
                 spend.total === null
                   ? 'no cost reported this month'
-                  : `${spend.total.cop} this month${spend.total.partial ? ` · ${spend.total.missing} provider without a reading` : ''}`
+                  : `${spend.total.cop} this month${spend.total.partial ? ` · ${plural(spend.total.missing, 'provider')} without a reading` : ''}`
               }
-              badge={spend.total?.partial ? 'partial' : undefined}
+              badge={
+                spend.total?.partial ? 'partial' : spend.total?.stamp.manual ? 'manual' : undefined
+              }
               provenance={spend.stamp}
               index={2}
             >
@@ -179,7 +174,7 @@ export default function ThemePreview() {
           />
           <Tile
             title="Linked"
-            value="→"
+            value={<span aria-hidden="true">→</span>}
             caption="the whole tile opens"
             accent="orange"
             href="#states"

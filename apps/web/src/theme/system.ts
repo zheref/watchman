@@ -42,7 +42,7 @@ const textStyles = defineTextStyles({
   'metro.label': {
     value: { fontSize: 'sm', fontWeight: 'semibold', letterSpacing: 'wide', lineHeight: 'short' },
   },
-  'metro.caption': { value: { fontSize: 'xs', letterSpacing: 'wide', lineHeight: 'short' } },
+  'metro.caption': { value: { fontSize: 'sm', letterSpacing: 'wide', lineHeight: 'moderate' } },
 });
 
 const config = defineConfig({
@@ -74,7 +74,7 @@ const config = defineConfig({
       },
       radii,
       sizes: {
-        tile: { cell: { value: '9.5rem' }, large: { value: '20rem' } },
+        tile: { cell: { value: '10rem' }, large: { value: '20.5rem' } },
       },
       easings: {
         // The Modern UI "exponential out" curve: quick start, long settle.

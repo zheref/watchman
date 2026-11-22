@@ -129,4 +129,10 @@ describe('formatting', () => {
     expect(monthOf(NOW)).toBe('2026-01');
     expect(monthOf(new Date('2026-11-30T23:00:00Z'))).toBe('2026-11');
   });
+
+  it('names the month in the owner’s calendar when given an offset', () => {
+    // 02:00 UTC on 1 December is still 30 November at UTC-5.
+    expect(monthOf(new Date('2026-12-01T02:00:00Z'), -300)).toBe('2026-11');
+    expect(monthOf(new Date('2026-11-30T23:00:00Z'), 120)).toBe('2026-12');
+  });
 });

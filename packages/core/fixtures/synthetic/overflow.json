@@ -1,0 +1,354 @@
+{
+  "$comment": "SYNTHETIC fixture: more candidates, providers and projects than any tile shows, with long titles. No real data.",
+  "schema_version": 1,
+  "synthetic": true,
+  "generated_at": "2026-01-14T15:00:00Z",
+  "attention": {
+    "state": "value",
+    "source": "synthetic",
+    "as_of": "2026-01-14T14:30:00Z",
+    "candidates": [
+      {
+        "id": "overflow-1",
+        "kind": "owner_decision",
+        "title": "Sample item 1 with a deliberately long title that has to wrap across several lines inside a small tile without breaking the layout",
+        "project": "Project Alpha",
+        "url": "https://example.com/overflow/items/1",
+        "value": 1,
+        "waiting_since": "2026-01-11T15:00:00.000Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "overflow-2",
+        "kind": "blocked_card",
+        "title": "Sample item 2",
+        "project": "Sample Orchard",
+        "url": "https://example.com/overflow/items/2",
+        "value": 2,
+        "waiting_since": "2026-01-10T15:00:00.000Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "overflow-3",
+        "kind": "waiting_pr",
+        "title": "Sample item 3",
+        "project": "Demo Lighthouse",
+        "url": "https://example.com/overflow/items/3",
+        "value": 3,
+        "waiting_since": "2026-01-09T15:00:00.000Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "overflow-4",
+        "kind": "owner_decision",
+        "title": "Sample item 4",
+        "project": "Project Alpha",
+        "url": "https://example.com/overflow/items/4",
+        "value": 4,
+        "waiting_since": "2026-01-08T15:00:00.000Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "overflow-5",
+        "kind": "blocked_card",
+        "title": "Sample item 5 with a deliberately long title that has to wrap across several lines inside a small tile without breaking the layout",
+        "project": "Sample Orchard",
+        "url": "https://example.com/overflow/items/5",
+        "value": 5,
+        "waiting_since": "2026-01-07T15:00:00.000Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "overflow-6",
+        "kind": "waiting_pr",
+        "title": "Sample item 6",
+        "project": "Demo Lighthouse",
+        "url": "https://example.com/overflow/items/6",
+        "value": 1,
+        "waiting_since": "2026-01-06T15:00:00.000Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "overflow-7",
+        "kind": "owner_decision",
+        "title": "Sample item 7",
+        "project": "Project Alpha",
+        "url": "https://example.com/overflow/items/7",
+        "value": 2,
+        "waiting_since": "2026-01-05T15:00:00.000Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "overflow-8",
+        "kind": "blocked_card",
+        "title": "Sample item 8",
+        "project": "Sample Orchard",
+        "url": "https://example.com/overflow/items/8",
+        "value": 3,
+        "waiting_since": "2026-01-04T15:00:00.000Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "overflow-9",
+        "kind": "waiting_pr",
+        "title": "Sample item 9 with a deliberately long title that has to wrap across several lines inside a small tile without breaking the layout",
+        "project": "Demo Lighthouse",
+        "url": "https://example.com/overflow/items/9",
+        "value": 4,
+        "waiting_since": "2026-01-03T15:00:00.000Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "overflow-10",
+        "kind": "owner_decision",
+        "title": "Sample item 10",
+        "project": "Project Alpha",
+        "url": "https://example.com/overflow/items/10",
+        "value": 5,
+        "waiting_since": "2026-01-02T15:00:00.000Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "overflow-11",
+        "kind": "blocked_card",
+        "title": "Sample item 11",
+        "project": "Sample Orchard",
+        "url": "https://example.com/overflow/items/11",
+        "value": 1,
+        "waiting_since": "2026-01-01T15:00:00.000Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "overflow-12",
+        "kind": "waiting_pr",
+        "title": "Sample item 12",
+        "project": "Demo Lighthouse",
+        "url": "https://example.com/overflow/items/12",
+        "value": 2,
+        "waiting_since": "2025-12-31T15:00:00.000Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      }
+    ]
+  },
+  "flow": {
+    "state": "value",
+    "source": "synthetic",
+    "as_of": "2026-01-14T14:30:00Z",
+    "projects": [
+      {
+        "project": "Sample Project A",
+        "open_prs": 10,
+        "open_issues": 20,
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "project": "Sample Project B",
+        "open_prs": 20,
+        "open_issues": 40,
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "project": "Sample Project C",
+        "open_prs": 30,
+        "open_issues": 60,
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "project": "Sample Project D",
+        "open_prs": 40,
+        "open_issues": 80,
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "project": "Sample Project E",
+        "open_prs": 50,
+        "open_issues": 100,
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "project": "Sample Project F",
+        "open_prs": 60,
+        "open_issues": 120,
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "project": "Sample Project G",
+        "open_prs": 70,
+        "open_issues": 140,
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "project": "Sample Project H",
+        "open_prs": 80,
+        "open_issues": 160,
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      }
+    ],
+    "work_items": [],
+    "board": {
+      "state": "no_data",
+      "reason": "board adapter not configured",
+      "source": "synthetic",
+      "as_of": "2026-01-14T15:00:00Z"
+    }
+  },
+  "spend": {
+    "state": "value",
+    "source": "synthetic",
+    "as_of": "2026-01-14T14:00:00Z",
+    "providers": [
+      {
+        "id": "sample-1",
+        "label": "Sample Provider 1",
+        "quota": {
+          "state": "value",
+          "used": 10,
+          "limit": 100,
+          "unit": "percent",
+          "resets_at": "2026-01-19T00:00:00Z",
+          "source": "synthetic-usage",
+          "as_of": "2026-01-14T14:00:00Z"
+        },
+        "monthly_cost": {
+          "state": "value",
+          "month": "2026-01",
+          "usd": 100,
+          "cop": 400000,
+          "source": "synthetic-billing",
+          "as_of": "2026-01-14T14:00:00Z"
+        }
+      },
+      {
+        "id": "sample-2",
+        "label": "Sample Provider 2",
+        "quota": {
+          "state": "value",
+          "used": 20,
+          "limit": 100,
+          "unit": "percent",
+          "resets_at": "2026-01-19T00:00:00Z",
+          "source": "synthetic-usage",
+          "as_of": "2026-01-14T14:00:00Z"
+        },
+        "monthly_cost": {
+          "state": "value",
+          "month": "2026-01",
+          "usd": 200,
+          "cop": 800000,
+          "source": "synthetic-billing",
+          "as_of": "2026-01-14T14:00:00Z"
+        }
+      },
+      {
+        "id": "sample-3",
+        "label": "Sample Provider 3",
+        "quota": {
+          "state": "value",
+          "used": 30,
+          "limit": 100,
+          "unit": "percent",
+          "resets_at": "2026-01-19T00:00:00Z",
+          "source": "synthetic-usage",
+          "as_of": "2026-01-14T14:00:00Z"
+        },
+        "monthly_cost": {
+          "state": "value",
+          "month": "2026-01",
+          "usd": 300,
+          "cop": 1200000,
+          "source": "synthetic-billing",
+          "as_of": "2026-01-14T14:00:00Z"
+        }
+      },
+      {
+        "id": "sample-4",
+        "label": "Sample Provider 4",
+        "quota": {
+          "state": "value",
+          "used": 40,
+          "limit": 100,
+          "unit": "percent",
+          "resets_at": "2026-01-19T00:00:00Z",
+          "source": "synthetic-usage",
+          "as_of": "2026-01-14T14:00:00Z"
+        },
+        "monthly_cost": {
+          "state": "value",
+          "month": "2026-01",
+          "usd": 400,
+          "cop": 1600000,
+          "source": "synthetic-billing",
+          "as_of": "2026-01-14T14:00:00Z"
+        }
+      },
+      {
+        "id": "sample-5",
+        "label": "Sample Provider 5",
+        "quota": {
+          "state": "value",
+          "used": 50,
+          "limit": 100,
+          "unit": "percent",
+          "resets_at": "2026-01-19T00:00:00Z",
+          "source": "synthetic-usage",
+          "as_of": "2026-01-14T14:00:00Z"
+        },
+        "monthly_cost": {
+          "state": "value",
+          "month": "2026-01",
+          "usd": 500,
+          "cop": 2000000,
+          "source": "synthetic-billing",
+          "as_of": "2026-01-14T14:00:00Z"
+        }
+      },
+      {
+        "id": "sample-6",
+        "label": "Sample Provider 6",
+        "quota": {
+          "state": "value",
+          "used": 60,
+          "limit": 100,
+          "unit": "percent",
+          "resets_at": "2026-01-19T00:00:00Z",
+          "source": "synthetic-usage",
+          "as_of": "2026-01-14T14:00:00Z"
+        },
+        "monthly_cost": {
+          "state": "value",
+          "month": "2026-01",
+          "usd": 600,
+          "cop": 2400000,
+          "source": "synthetic-billing",
+          "as_of": "2026-01-14T14:00:00Z"
+        }
+      }
+    ]
+  },
+  "metrics": {
+    "state": "no_data",
+    "reason": "no scorecard source exists yet",
+    "source": "synthetic",
+    "as_of": "2026-01-14T15:00:00Z"
+  }
+}

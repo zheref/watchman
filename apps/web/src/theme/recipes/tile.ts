@@ -26,6 +26,9 @@ export const tileRecipe = defineSlotRecipe({
       color: 'tile.fg',
       borderRadius: 'none',
       overflow: 'hidden',
+      // The figure sizes itself against the tile's own width (cqi), so enlarged text shrinks the
+      // figure before it would overflow the tile.
+      containerType: 'inline-size',
       textDecoration: 'none',
       outline: 'none',
       transformOrigin: 'center',
@@ -39,6 +42,10 @@ export const tileRecipe = defineSlotRecipe({
         transitionTimingFunction: 'metro',
         _active: { transform: 'scale(0.97)' },
       },
+      // Pressed and hover cues that do not depend on motion (reduced-motion users get them too).
+      // Darkening only raises the white text's contrast; the hover cue is an inset white edge.
+      _active: { filter: 'brightness(0.85)' },
+      '&:is(a):hover': { boxShadow: 'inset 0 0 0 2px {colors.tile.fg}' },
       _focusVisible: {
         outlineWidth: '3px',
         outlineStyle: 'solid',
@@ -49,6 +56,7 @@ export const tileRecipe = defineSlotRecipe({
     },
     header: {
       display: 'flex',
+      flexWrap: 'wrap',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
       gap: '2',
@@ -69,18 +77,22 @@ export const tileRecipe = defineSlotRecipe({
       borderWidth: '1px',
       borderColor: 'tile.fg',
       whiteSpace: 'nowrap',
+      flexShrink: 0,
     },
     body: { display: 'flex', flexDirection: 'column', gap: '1', minWidth: '0' },
     value: {
       fontWeight: 'light',
       lineHeight: '1',
+      // A figure never breaks mid-number; the global wrap rule would split "$10.00".
+      overflowWrap: 'normal',
+      wordBreak: 'keep-all',
       letterSpacing: 'tight',
       fontVariantNumeric: 'tabular-nums',
     },
-    caption: { fontSize: 'sm', lineHeight: 'short' },
+    caption: { fontSize: 'md', lineHeight: 'moderate' },
     footer: {
-      fontSize: 'xs',
-      lineHeight: 'short',
+      fontSize: 'sm',
+      lineHeight: 'moderate',
       letterSpacing: 'wide',
       overflowWrap: 'anywhere',
     },
@@ -89,23 +101,25 @@ export const tileRecipe = defineSlotRecipe({
     size: {
       small: {
         root: { gridColumn: 'span 1', gridRow: 'span 1', minHeight: 'tile.cell' },
-        value: { fontSize: '4xl' },
+        value: { fontSize: 'min({fontSizes.4xl}, 24cqi)' },
       },
       wide: {
         root: {
-          gridColumn: 'span 2',
+          // Full row on narrow grids (which may be one column when text is enlarged), two cells
+          // from a tablet up.
+          gridColumn: { base: '1 / -1', md: 'span 2' },
           gridRow: 'span 1',
           minHeight: 'tile.cell',
         },
-        value: { fontSize: '5xl' },
+        value: { fontSize: 'min({fontSizes.5xl}, 18cqi)' },
       },
       large: {
         root: {
-          gridColumn: 'span 2',
+          gridColumn: { base: '1 / -1', md: 'span 2' },
           gridRow: 'span 2',
           minHeight: 'tile.large',
         },
-        value: { fontSize: '6xl' },
+        value: { fontSize: 'min({fontSizes.6xl}, 24cqi)' },
       },
     },
     accent: accentVariants,

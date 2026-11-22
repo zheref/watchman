@@ -8,8 +8,9 @@ import type { PartialSnapshot, SourceAdapter } from './source';
  *
  * Core stays free of platform APIs, so the caller injects the file reader (Node's `readFile` on
  * the server). The directory comes from {@link SNAPSHOT_DIR_ENV}; there is no default path, and
- * the directory never appears in a source label or an error message, so it cannot leak into a
- * rendered page.
+ * the directory never appears in a source label, an error message or an error's `cause` (only a
+ * read error's `code` is kept), so neither the path nor a fragment of the file can leak into a
+ * page or a log.
  */
 
 /** The server-side environment variable naming the snapshot directory. */
@@ -66,14 +67,20 @@ export function createFileSnapshotAdapter(options: FileSnapshotAdapterOptions): 
       let text: string;
       try {
         text = await options.readText(path);
-      } catch (cause) {
-        throw new SnapshotSourceError(`${source}: could not be read`, { cause });
+      } catch (error) {
+        // Keep only the error code: Node's message carries the absolute path.
+        const code = (error as { code?: unknown } | null)?.code;
+        throw new SnapshotSourceError(
+          `${source}: could not be read${typeof code === 'string' ? ` (${code})` : ''}`,
+          typeof code === 'string' ? { cause: { code } } : undefined,
+        );
       }
       let json: unknown;
       try {
         json = JSON.parse(text);
-      } catch (cause) {
-        throw new SnapshotSourceError(`${source}: not valid JSON`, { cause });
+      } catch {
+        // No cause: a parser error quotes a fragment of the file.
+        throw new SnapshotSourceError(`${source}: not valid JSON`);
       }
       const result = parseSnapshot(json);
       if (!result.ok) throw new SnapshotValidationError(result.issues, source);

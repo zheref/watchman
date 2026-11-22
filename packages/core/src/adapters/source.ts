@@ -1,14 +1,16 @@
-import { noData, type NoData } from '../provenance';
+import { combineProvenance, isoDateTime, noData, type NoData } from '../provenance';
 import {
+  AS_OF_SKEW_MS,
   SECTION_KEYS,
+  asOfLaterThan,
   SNAPSHOT_SCHEMA_VERSION,
   assertSnapshot,
+  sectionSchemas,
   type Board,
   type SectionKey,
   type SectionMap,
   type Snapshot,
 } from '../snapshot';
-import { toMillis } from '../time';
 
 /**
  * Source adapters: one per place Watchman reads from (GitHub, a handoff board, a tracker, a file;
@@ -59,16 +61,6 @@ export interface CollectedSnapshot {
 
 type ValueOf<K extends SectionKey> = Extract<SectionMap[K], { state: 'value' }>;
 
-function provenanceOf(values: readonly { source: string; as_of: string; manual?: boolean }[]) {
-  const sources = [...new Set(values.map((v) => v.source))].sort();
-  const oldest = values.reduce(
-    (min, v) => (toMillis(v.as_of) < toMillis(min) ? v.as_of : min),
-    values[0]!.as_of,
-  );
-  const manual = values.some((v) => v.manual === true);
-  return { source: sources.join(' + '), as_of: oldest, ...(manual ? { manual: true } : {}) };
-}
-
 function firstBoard(values: readonly ValueOf<'flow'>[]): Board {
   return values.find((v) => v.board.state === 'value')?.board ?? values[0]!.board;
 }
@@ -96,7 +88,7 @@ export function mergeSection<K extends SectionKey>(
   const values = reports.filter((r): r is ValueOf<K> => r.state === 'value');
   if (values.length === 0) return reports[0];
   if (values.length === 1) return values[0];
-  const provenance = provenanceOf(values);
+  const provenance = combineProvenance(values);
   switch (key) {
     case 'attention': {
       const v = values as unknown as ValueOf<'attention'>[];
@@ -136,7 +128,7 @@ export function mergeSection<K extends SectionKey>(
         ),
       } as SectionMap[K];
     }
-    default: {
+    case 'metrics': {
       const v = values as unknown as ValueOf<'metrics'>[];
       return {
         state: 'value',
@@ -147,16 +139,58 @@ export function mergeSection<K extends SectionKey>(
         ),
       } as SectionMap[K];
     }
+    default:
+      return assertNever(key);
   }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`unhandled section key: ${String(value)}`);
+}
+
+/**
+ * Checks one adapter report before it is merged: every section it carries must parse, and no
+ * stamp in it may be later than the collection instant. Returns the parsed sections, or a reason.
+ */
+export function validateReport(
+  report: PartialSnapshot,
+  now: Date,
+): { ok: true; sections: Partial<SectionMap> } | { ok: false; reason: string } {
+  if (!isoDateTime.safeParse(report.as_of).success) {
+    return { ok: false, reason: `report as_of is not an ISO 8601 date-time: ${report.as_of}` };
+  }
+  const limit = now.getTime() + AS_OF_SKEW_MS;
+  const sections: Partial<SectionMap> = {};
+  for (const key of SECTION_KEYS) {
+    const raw = report.sections[key];
+    if (raw === undefined) continue;
+    const parsed = sectionSchemas[key].safeParse(raw);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return {
+        ok: false,
+        reason: `${key} is invalid: ${issue ? `${issue.path.join('.')} ${issue.message}` : 'unknown'}`,
+      };
+    }
+    const future = asOfLaterThan(parsed.data, limit, 'the collection', [key]);
+    if (future.length > 0) {
+      return { ok: false, reason: `${future[0]!.path}: ${future[0]!.message}` };
+    }
+    (sections as Record<SectionKey, unknown>)[key] = parsed.data;
+  }
+  return { ok: true, sections };
 }
 
 /** The label a collected snapshot uses for sections nobody reported. */
 export const COLLECTOR_SOURCE = 'watchman';
 
 /**
- * Runs every adapter at `context.now`, merges their reports and validates the result. One
- * adapter failing never sinks the others: it is listed in `failures` and its sections fall
- * back to `no_data`.
+ * Runs every adapter at `context.now`, validates each report, merges the valid ones and validates
+ * the result. One adapter failing — throwing, rejecting or reporting something invalid — never
+ * sinks the others: it is listed in `failures`, and a section only it would have reported falls
+ * back to `no_data`. A section other adapters did report is merged from them alone, so
+ * **`failures` is how a caller knows a merged section may be incomplete**; surface it beside the
+ * tiles.
  */
 export async function collectSnapshot(
   adapters: readonly SourceAdapter[],
@@ -171,8 +205,11 @@ export async function collectSnapshot(
   const failures: AdapterFailure[] = [];
   settled.forEach((result, index) => {
     const adapter = adapters[index]!.id;
-    if (result.status === 'fulfilled') reports.push(result.value);
-    else {
+    if (result.status === 'fulfilled') {
+      const checked = validateReport(result.value, context.now);
+      if (checked.ok) reports.push({ ...result.value, sections: checked.sections });
+      else failures.push({ adapter, message: `invalid report: ${checked.reason}` });
+    } else {
       const reason: unknown = result.reason;
       failures.push({
         adapter,

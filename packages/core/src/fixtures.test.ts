@@ -6,7 +6,13 @@ import { parseSnapshot } from './index';
  * repository: links only to the reserved example.com domain, and nothing shaped like an email
  * address or a token.
  */
-const fixtures = import.meta.glob<unknown>('../fixtures/synthetic/*.json', {
+// Vite (Vitest) resolves import.meta.glob at test time. Core has no Vite types and declares none
+// globally — production core code must not be able to call it — so the one call is typed here.
+type Glob = (
+  pattern: string,
+  options: { eager: true; import: 'default' },
+) => Record<string, unknown>;
+const fixtures = (import.meta as unknown as { glob: Glob }).glob('../fixtures/synthetic/*.json', {
   eager: true,
   import: 'default',
 });
@@ -21,7 +27,7 @@ function strings(node: unknown): string[] {
 
 describe('synthetic fixtures', () => {
   it('exist', () => {
-    expect(entries.length).toBeGreaterThanOrEqual(3);
+    expect(entries.length).toBeGreaterThanOrEqual(7);
   });
 
   describe.each(entries)('%s', (_file, json) => {

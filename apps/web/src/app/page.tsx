@@ -28,7 +28,7 @@ export default function Home() {
           title="Theme preview"
           accent="cobalt"
           href="/theme"
-          value="→"
+          value={<span aria-hidden="true">→</span>}
           caption="See every tile state"
         />
       </TileGrid>

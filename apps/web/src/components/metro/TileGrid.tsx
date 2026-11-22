@@ -4,8 +4,8 @@ import { chakra } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
 
 /**
- * The start-screen grid tiles sit on: two columns on a phone, as many 9.5rem cells as fit from a
- * tablet up, packed densely so wide and large tiles leave no holes.
+ * The start-screen grid tiles sit on: as many 10rem cells as fit (two on a phone), packed densely
+ * so wide and large tiles leave no holes.
  */
 export function TileGrid({ children, label }: { children: ReactNode; label?: string }) {
   return (
@@ -13,10 +13,9 @@ export function TileGrid({ children, label }: { children: ReactNode; label?: str
       role={label === undefined ? undefined : 'group'}
       aria-label={label}
       display="grid"
-      gridTemplateColumns={{
-        base: 'repeat(2, minmax(0, 1fr))',
-        md: 'repeat(auto-fill, minmax({sizes.tile.cell}, 1fr))',
-      }}
+      // As many 10rem cells as fit, at least one. The cell is in rem, so enlarged text reflows the
+      // grid to fewer, wider columns instead of squeezing tiles (WCAG 1.4.4, 1.4.10).
+      gridTemplateColumns="repeat(auto-fill, minmax(min(100%, {sizes.tile.cell}), 1fr))"
       gridAutoRows="minmax({sizes.tile.cell}, auto)"
       gridAutoFlow="row dense"
       gap="2"

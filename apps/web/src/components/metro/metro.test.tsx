@@ -67,7 +67,7 @@ describe('Tile', () => {
   it('accepts a custom footer and caps the entrance stagger', () => {
     const html = renderMarkup(<Tile title="T" footer="custom footer" index={99} />);
     expect(html).toContain('custom footer');
-    expect(html).toContain('animation-delay:720ms');
+    expect(html).toContain('animation-delay:300ms');
   });
 
   it('styles from the theme: flat accent, square corners, motion only when allowed', () => {

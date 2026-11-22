@@ -70,16 +70,48 @@ describe('createFileSnapshotAdapter', () => {
         .filter(([name]) => name !== 'missing.json')
         .map(([name, text]) => [`${secretDir}/${name}`, text]),
     );
-    const { readText } = memoryReader(files);
+    const { readText: memory } = memoryReader(files);
+    // Like Node's readFile: a missing file rejects with a code and a message naming the path.
+    const readText = (path: string) =>
+      memory(path).catch(() =>
+        Promise.reject(
+          Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
+            code: 'ENOENT',
+          }),
+        ),
+      );
     const run = (fileName: string) =>
       createFileSnapshotAdapter({ dir: secretDir, fileName, readText }).fetch({ now: NOW });
 
     await expect(run('missing.json')).rejects.toThrow(SnapshotSourceError);
+    await expect(run('missing.json')).rejects.toMatchObject({
+      message: 'file:missing.json: could not be read (ENOENT)',
+      cause: { code: 'ENOENT' },
+    });
     await expect(run('broken.json')).rejects.toThrow('file:broken.json: not valid JSON');
     await expect(run('invalid.json')).rejects.toThrow(SnapshotValidationError);
     for (const name of Object.keys(cases)) {
-      await run(name).catch((error: Error) => expect(error.message).not.toContain(secretDir));
+      const error = (await run(name).then(
+        () => null,
+        (e: unknown) => e,
+      )) as Error & { cause?: unknown };
+      expect(error.message).not.toContain(secretDir);
+      expect(JSON.stringify(error.cause ?? null)).not.toContain(secretDir);
+      expect(String(error.stack)).not.toContain(secretDir);
     }
+  });
+
+  it('reports a read failure without a code plainly', async () => {
+    const adapter = createFileSnapshotAdapter({
+      dir: '/d',
+      readText: () => Promise.reject('no code'),
+    });
+    const error = (await adapter.fetch({ now: NOW }).then(
+      () => null,
+      (e: unknown) => e,
+    )) as Error;
+    expect(error.message).toBe('file:snapshot.json: could not be read');
+    expect(error.cause).toBeUndefined();
   });
 
   it.each(['../snapshot.json', 'a/b.json', 'snapshot.txt', '.hidden.json', 'x..json'])(
