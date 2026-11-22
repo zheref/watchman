@@ -1,5 +1,5 @@
-This is the Watchman Expo/React Native app, a scaffold for now. It will reuse `@watchman/core` and
-show the Attention tile. Prioritize mobile-first patterns, performance, and cross-platform
+This is the Watchman Expo/React Native app. It reuses `@watchman/core` (ranking, validation and
+provenance are imported, never copied) and shows the Attention tile. Prioritize mobile-first patterns, performance, and cross-platform
 compatibility.
 
 ## Expo has changed — do not trust your training data
@@ -19,8 +19,12 @@ removed. Before writing any code that touches an Expo or React Native API:
   the repository root's `package-lock.json`; run installs from the root.
 - **Local builds only.** Build with `npx expo run:ios` / `npx expo run:android` on your own machine.
   No EAS cloud builds, submissions or updates, and no other paid build service.
-- **Entry point is `App.tsx`** (via `index.ts`). Expo Router is not adopted yet; the Attention-tile
-  phase adopts it, with exactly one route directory (`src/app/`) and its `_layout.tsx`.
+- **Expo Router, one route directory.** The entry is `expo-router/entry` (`main` in `package.json`);
+  routes live only in `src/app/` with its `_layout.tsx`. Keep screens thin: logic goes in
+  `src/lib/` as pure, unit-tested modules (the Vitest project runs `src/**/*.test.ts` in plain Node,
+  so a tested module must not import `react-native`).
+- **No `metro.config.js`.** Expo's Metro config handles npm workspaces itself (SDK 52+); add one only
+  for a need it cannot meet.
 - **Read-only, public repository.** No secrets, tokens or real data in this app's code or assets.
 
 ## Commands
@@ -29,6 +33,7 @@ removed. Before writing any code that touches an Expo or React Native API:
 npx expo install <package>          # resolves SDK-compatible versions; run from apps/mobile
 npm run start:mobile                # from the repository root: the Expo dev server
 npm run typecheck --workspace @watchman/mobile
+npm run build --workspace @watchman/mobile    # expo export (iOS + Android), the headless build proof
 npm run lint                        # from the repository root: one ESLint + Prettier config
 npx expo-doctor                     # diagnose dependency and config issues
 ```

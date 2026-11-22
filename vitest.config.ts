@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config';
 // coverage report (nen shu coverage). Both paths are git-ignored.
 export default defineConfig({
   test: {
-    projects: ['packages/*', 'apps/web', 'artifacts'],
+    projects: ['packages/*', 'apps/web', 'apps/mobile', 'artifacts'],
     reporters: ['default', ['junit', { outputFile: '.nen/test-results/vitest.xml' }]],
     coverage: {
       enabled: true,
@@ -14,6 +14,7 @@ export default defineConfig({
         'packages/*/src/**/*.ts',
         'packages/*/scripts/**/*.ts',
         'apps/web/src/**/*.{ts,tsx}',
+        'apps/mobile/src/**/*.{ts,tsx}',
         'artifacts/*.tsx',
       ],
       // Barrels only re-export and test helpers are not product code; any other index.ts that
@@ -28,6 +29,12 @@ export default defineConfig({
         // The root layout is the composition root: it loads next/font, which only runs inside a
         // Next build. It is proved by `next build` and the /theme screenshots (UZF-19 exemption).
         'apps/web/src/app/layout.tsx',
+        // The mobile screen, its route layout and its tile component are React Native views with
+        // no logic of their own (the view-model carries it, and is measured). They need the native
+        // runtime, so they are proved by `expo export` bundling them for iOS and Android (UZF-19).
+        'apps/mobile/src/app/**',
+        'apps/mobile/src/components/**',
+        'apps/mobile/src/theme.ts',
       ],
       reporter: ['text-summary', 'lcov'],
       reportsDirectory: 'coverage',
