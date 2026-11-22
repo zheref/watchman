@@ -1,0 +1,118 @@
+{
+  "$schema": "nen.contract/v0.1",
+  "project": {
+    "$comment": "One lane at the repository root: every verb runs the root npm script that CI (.github/workflows/ci.yml) runs, so nen shu and CI cannot disagree. npm only.",
+    "lanes": {
+      "watchman": {
+        "stack": "nextjs",
+        "cwd": "."
+      }
+    },
+    "defaultLane": "watchman",
+    "verbs": {
+      "watchman": {
+        "lint": {
+          "exe": "npm",
+          "argv": [
+            "run",
+            "lint"
+          ],
+          "why": "ESLint (one root flat config) over every workspace, then a Prettier check."
+        },
+        "typecheck": {
+          "exe": "npm",
+          "argv": [
+            "run",
+            "typecheck"
+          ],
+          "why": "tsc --noEmit in every workspace; apps/web generates its Next route types first."
+        },
+        "test": {
+          "exe": "npm",
+          "argv": [
+            "test"
+          ],
+          "why": "Vitest across packages/* from the root config; writes JUnit results and an lcov coverage report (both git-ignored).",
+          "artifacts": [
+            ".nen/test-results/vitest.xml",
+            "coverage/lcov.info"
+          ]
+        },
+        "build": {
+          "exe": "npm",
+          "argv": [
+            "run",
+            "build"
+          ],
+          "why": "Production build of every workspace that has one (today apps/web: next build)."
+        },
+        "dev": {
+          "exe": "npm",
+          "argv": [
+            "run",
+            "dev:web"
+          ],
+          "why": "The apps/web Next.js dev server on localhost."
+        },
+        "run": {
+          "exe": "npm",
+          "argv": [
+            "run",
+            "start",
+            "--workspace",
+            "@watchman/web"
+          ],
+          "why": "The apps/web production server; requires a prior build."
+        },
+        "coverage": {
+          "exe": "npm",
+          "argv": [
+            "test"
+          ],
+          "artifacts": [
+            "coverage/lcov.info"
+          ],
+          "why": "The same root Vitest run, which always captures v8 coverage of packages/*/src into coverage/lcov.info. Prefer nen shu coverage --from-capture after a test run."
+        },
+        "archive": {
+          "unsupported": "Nothing is packaged: the web app is deployed from source and the Expo app is a scaffold with no build profile."
+        },
+        "release": {
+          "unsupported": "No release or store pipeline: a private, single-user dashboard with no published package."
+        },
+        "deploy": {
+          "unsupported": "No deploy target is wired; any deployment must sit behind access protection and is the owner's call."
+        }
+      }
+    },
+    "hosts": {
+      "*": [
+        "darwin",
+        "linux"
+      ]
+    },
+    "toolchain": {
+      "node": {
+        "version": ">=24.0.0",
+        "probe": [
+          "node",
+          "--version"
+        ],
+        "versionFrom": "first-semver-on-stdout",
+        "installer": "verify-only",
+        "why": "Node 24 is the declared runtime (.nvmrc, package.json engines) and what CI runs."
+      },
+      "npm": {
+        "version": ">=11.0.0",
+        "probe": [
+          "npm",
+          "--version"
+        ],
+        "versionFrom": "first-semver-on-stdout",
+        "installer": "verify-only",
+        "why": "npm is the only package manager; workspaces and the single root package-lock.json need npm 11."
+      }
+    },
+    "targets": {}
+  }
+}

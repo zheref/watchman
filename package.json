@@ -1,0 +1,35 @@
+{
+  "name": "watchman",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Single-user, read-only executive dashboard: web app, read-only MCP server, Expo scaffold and shared core.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24",
+    "npm": ">=11"
+  },
+  "packageManager": "npm@11.13.0",
+  "scripts": {
+    "lint": "eslint . --max-warnings=0 && prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "build": "npm run build --workspaces --if-present",
+    "dev:web": "npm run dev --workspace @watchman/web",
+    "start:mobile": "npm run start --workspace @watchman/mobile"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@vitest/coverage-v8": "^5.1.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.6",
+    "prettier": "^3.10.1",
+    "typescript": "~6.0.3",
+    "vitest": "^5.1.1"
+  }
+}
