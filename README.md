@@ -26,26 +26,41 @@ than filled in.
 | v1      | a read-only MCP server in `packages/mcp`, so agents can read the same views    |
 | later   | an Expo app in `apps/mobile` (scaffold only today) that reuses `packages/core` |
 
-This repository is at the **bootstrap** stage: the workspace, tooling and CI are in place, and the
-apps and packages are deliberately minimal stubs. Theme, domain types, fixtures, tiles and the MCP
-server land in later pull requests.
+The workspace, tooling and CI are in place, along with the Metro theme, the shared domain model
+and the synthetic fixtures. The real home view, its drill-downs and the MCP server land in later
+pull requests.
 
 ## Layout
 
 This is one npm-workspaces monorepo (npm only: no pnpm, yarn or bun, and one root
 `package-lock.json`).
 
-| Path            | Package            | What it is                                                                                                                                   |
-| --------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`      | `@watchman/web`    | Next.js (App Router, TypeScript). Today the clean `create-next-app` starter; it becomes the v1 dashboard.                                    |
-| `apps/mobile`   | `@watchman/mobile` | Expo (TypeScript). Scaffold only; it will show the Attention tile.                                                                           |
-| `packages/core` | `@watchman/core`   | Shared data adapters, types and the scoring/ranking logic. Today: a stable `topN` ranking primitive and its tests.                           |
-| `packages/mcp`  | `@watchman/mcp`    | The read-only MCP server. Today: no server and no SDK, only the transport guard that keeps it on stdio or a loopback address, and its tests. |
+| Path            | Package            | What it is                                                                                                                                       |
+| --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/web`      | `@watchman/web`    | Next.js (App Router, TypeScript) with the Chakra UI v3 Metro theme and its tile, pivot-header and page-shell primitives; `/theme` previews them. |
+| `apps/mobile`   | `@watchman/mobile` | Expo (TypeScript). Scaffold only; it will show the Attention tile.                                                                               |
+| `packages/core` | `@watchman/core`   | The versioned `Snapshot` model and its validation, the Attention ranking and Flow/Spend/Metrics helpers, source adapters and synthetic fixtures. |
+| `packages/mcp`  | `@watchman/mcp`    | The read-only MCP server. Today: no server and no SDK, only the transport guard that keeps it on stdio or a loopback address, and its tests.     |
 
 Shared tooling lives at the root: `tsconfig.base.json` (every workspace extends it), one
 `eslint.config.mjs` (typescript-eslint everywhere, plus Next's rules for `apps/web`), one Prettier
-config, and a Vitest config that runs every `packages/*` project. The two apps have no test lane
-yet; each gets one with its first non-starter code (tracked in #4 and #6).
+config, and a Vitest config that runs every `packages/*` project and `apps/web`. `apps/mobile` has
+no test lane yet; it gets one with its first non-starter code (tracked in #6).
+
+### The snapshot model
+
+Everything the dashboard shows comes from one versioned document, the **snapshot**
+(`packages/core/src/snapshot.ts`), with four sections: Attention, Flow, Spend and Metrics.
+
+- Every figure lives in a record that carries its `source` and `as_of` (ISO 8601 with an offset).
+  A record that could not be observed is an explicit `{ "state": "no_data", "reason": … }` record,
+  never a zero or a placeholder. Hand-typed figures carry `"manual": true`.
+- `parseSnapshot` validates untrusted input (unknown versions, keys and non-`https` links are
+  refused); `collectSnapshot` runs the configured **source adapters** and merges their reports.
+- The only adapter today reads a snapshot file from the directory in `WATCHMAN_SNAPSHOT_DIR`
+  (server-side only, no default; see `apps/web/src/server/snapshot.ts`). Unset means "no data".
+- Synthetic fixtures live in `packages/core/fixtures/synthetic/`; a test validates every one and
+  checks it is marked synthetic and links only to `example.com`.
 
 The stack handbook this repository resolves is `react-uzf-v1`. Its monorepo topology (RC-49 to
 RC-51) differs from this layout (an MCP package, npm workspaces, no Redux or shared-UI tier); the
@@ -59,17 +74,18 @@ Requires Node 24 (see `.nvmrc`) and npm 11.
 npm ci              # install every workspace from the root lockfile
 npm run lint        # ESLint + Prettier check
 npm run typecheck   # tsc on the root config, then every workspace (Next route types first)
-npm test            # Vitest across packages/*
+npm test            # Vitest across packages/* and apps/web
 npm run build       # production build of apps/web
 ```
 
 CI runs the same commands on every pull request and on pushes to `main`. The web build needs
-network access: the starter layout loads its fonts through `next/font/google` at build time.
+network access: the layout self-hosts Open Sans (the Segoe-like fallback) through
+`next/font/google` at build time.
 
 ### Each workspace
 
 ```bash
-npm run dev:web                              # apps/web on http://localhost:3000
+npm run dev:web                              # apps/web on http://localhost:3000 (/theme previews the theme)
 npm run start:mobile                         # apps/mobile: Expo dev server (Expo Go or a simulator)
 npm test --workspace @watchman/core          # one package's tests
 npm test --workspace @watchman/mcp
@@ -84,7 +100,7 @@ This repository is public. The rules below apply to every change:
 
 - **Synthetic fixtures only.** Nothing committed contains real usage or spend figures, quota
   readings, personal data, account identifiers, tokens or screenshots of real data. Every fixture is
-  labelled synthetic (for example `fixtures/synthetic/*.json` carrying `"synthetic": true`).
+  labelled synthetic (`packages/core/fixtures/synthetic/*.json` carrying `"synthetic": true`).
 - **Real data only at runtime, server-side.** Real snapshots are read at runtime on the server, from
   the directory named by the `WATCHMAN_SNAPSHOT_DIR` environment variable, which points outside the
   repository. The location is configuration, never hard-coded, and never reaches client code. Local

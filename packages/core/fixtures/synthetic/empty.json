@@ -1,0 +1,30 @@
+{
+  "$comment": "SYNTHETIC fixture: every section missing, as on a first run with no sources configured.",
+  "schema_version": 1,
+  "synthetic": true,
+  "generated_at": "2026-01-14T15:00:00Z",
+  "attention": {
+    "state": "no_data",
+    "reason": "no attention source configured",
+    "source": "synthetic",
+    "as_of": "2026-01-14T15:00:00Z"
+  },
+  "flow": {
+    "state": "no_data",
+    "reason": "no flow source configured",
+    "source": "synthetic",
+    "as_of": "2026-01-14T15:00:00Z"
+  },
+  "spend": {
+    "state": "no_data",
+    "reason": "no spend source configured",
+    "source": "synthetic",
+    "as_of": "2026-01-14T15:00:00Z"
+  },
+  "metrics": {
+    "state": "no_data",
+    "reason": "no scorecard source exists yet",
+    "source": "synthetic",
+    "as_of": "2026-01-14T15:00:00Z"
+  }
+}

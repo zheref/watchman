@@ -23,3 +23,11 @@ export function topN<T>(items: readonly T[], limit: number, score: Scorer<T>): T
     .slice(0, limit)
     .map((entry) => entry.item);
 }
+
+/**
+ * Code-unit string order (not locale order), so a tie-break gives the same answer in Node,
+ * a browser and Hermes whatever their ICU data.
+ */
+export function compareText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}

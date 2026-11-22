@@ -2,14 +2,19 @@
   "name": "@watchman/core",
   "version": "0.0.0",
   "private": true,
-  "description": "Shared data adapters, types and scoring/ranking logic for Watchman.",
+  "description": "Shared domain model (the versioned Snapshot), its validation, the Attention/Flow/Spend/Metrics logic, source adapters and synthetic fixtures for Watchman.",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./fixtures/synthetic/*.json": "./fixtures/synthetic/*.json"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
   }
 }
