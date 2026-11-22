@@ -1,8 +1,15 @@
 # --- Public-repo safeguards: never commit local-only or real data -------------
 # Local agent worktrees
 .claude/worktrees/
-# Environment files and tokens (all variants)
+# Environment files, tokens and credentials (all variants)
 .env*
+*.env
+.npmrc
+credentials*.json
+.claude/settings.local.json
+.mcp.json
+google-services.json
+GoogleService-Info.plist
 # Vercel project link
 .vercel
 # Local-only session notes

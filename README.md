@@ -44,7 +44,12 @@ This is one npm-workspaces monorepo (npm only: no pnpm, yarn or bun, and one roo
 
 Shared tooling lives at the root: `tsconfig.base.json` (every workspace extends it), one
 `eslint.config.mjs` (typescript-eslint everywhere, plus Next's rules for `apps/web`), one Prettier
-config, and a Vitest config that runs every `packages/*` project.
+config, and a Vitest config that runs every `packages/*` project. The two apps have no test lane
+yet; each gets one with its first non-starter code (tracked in #4 and #6).
+
+The stack handbook this repository resolves is `react-uzf-v1`. Its monorepo topology (RC-49 to
+RC-51) differs from this layout (an MCP package, npm workspaces, no Redux or shared-UI tier); the
+ruling on that difference is tracked in #8.
 
 ## Getting started
 
@@ -53,12 +58,13 @@ Requires Node 24 (see `.nvmrc`) and npm 11.
 ```bash
 npm ci              # install every workspace from the root lockfile
 npm run lint        # ESLint + Prettier check
-npm run typecheck   # tsc in every workspace (Next route types are generated first)
+npm run typecheck   # tsc on the root config, then every workspace (Next route types first)
 npm test            # Vitest across packages/*
 npm run build       # production build of apps/web
 ```
 
-CI runs the same commands on every pull request and on pushes to `main`.
+CI runs the same commands on every pull request and on pushes to `main`. The web build needs
+network access: the starter layout loads its fonts through `next/font/google` at build time.
 
 ### Each workspace
 
@@ -85,10 +91,15 @@ This repository is public. The rules below apply to every change:
   snapshot paths (`watchman-data/`, `.watchman-private/`, `snapshot-*.json`) are git-ignored.
 - **Tokens stay server-side.** Credentials are supplied through the server environment only and are
   never committed, logged or shipped to a browser bundle. `.env*` files are git-ignored.
-- **The MCP server is never exposed unauthenticated.** It is read-only, has no write tools, and binds
-  to stdio or a loopback address by default (`packages/mcp` enforces this today).
+- **The MCP server is never exposed unauthenticated.** It will be read-only, with no write tools,
+  and bind to stdio or a loopback address by default. The server itself lands in a later pull
+  request; today `packages/mcp` holds only the transport guard it must call: stdio by default,
+  and HTTP refused unless it is loopback-bound, requires a server-side bearer token and allows only
+  loopback origins.
 - **The deployed web app sits behind access protection** before any data-bearing deploy exists.
-- Every pull request runs a secret and PII scan on its diff and records the result.
+- **Every pull request is scanned for secrets and PII before it opens.** The author runs the scan on
+  the diff (for example `gitleaks` and `secretlint`, plus a grep for token shapes and real figures)
+  and records the result in the pull request body. CI does not run this scan yet.
 
 ## Licence
 

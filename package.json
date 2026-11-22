@@ -17,7 +17,7 @@
   "scripts": {
     "lint": "eslint . --max-warnings=0 && prettier --check .",
     "format": "prettier --write .",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "tsc -p tsconfig.json && npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "build": "npm run build --workspaces --if-present",
     "dev:web": "npm run dev --workspace @watchman/web",

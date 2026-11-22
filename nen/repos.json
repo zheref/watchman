@@ -6,7 +6,8 @@
       "role": "Watchman -- a single-user, read-only executive dashboard (Next.js web, read-only MCP server, Expo scaffold, shared core) in one npm-workspaces monorepo",
       "kind": "product",
       "gate": "G2",
-      "consumes": ["zheref/hatsu", "zheref/nen"]
+      "consumes": ["zheref/hatsu", "zheref/nen"],
+      "scenario": "react-uzf-v1"
     }
   ],
   "maintained_tools": [

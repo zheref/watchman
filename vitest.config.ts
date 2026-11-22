@@ -11,7 +11,8 @@ export default defineConfig({
       enabled: true,
       provider: 'v8',
       include: ['packages/*/src/**/*.ts'],
-      exclude: ['**/*.test.ts', '**/index.ts'],
+      // The two barrels only re-export; any other index.ts that carries logic stays measured.
+      exclude: ['**/*.test.ts', 'packages/core/src/index.ts', 'packages/mcp/src/index.ts'],
       reporter: ['text-summary', 'lcov'],
       reportsDirectory: 'coverage',
     },

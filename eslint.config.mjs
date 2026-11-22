@@ -32,4 +32,22 @@ export default defineConfig([
     settings: { next: { rootDir: 'apps/web/' } },
   },
   ...nextTs,
+  {
+    // packages/core is shared by web, mobile (Hermes) and the MCP server, so it stays
+    // framework-blind: no Node built-ins, no Next, Expo, React Native or React DOM.
+    files: ['packages/core/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['node:*', 'next', 'next/*', 'expo', 'expo-*', 'react-native', 'react-dom'],
+              message: 'packages/core must stay framework-blind (RC-50).',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);

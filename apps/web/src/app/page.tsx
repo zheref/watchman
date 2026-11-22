@@ -44,13 +44,7 @@ export default function Home() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
+            <Image className={styles.logo} src="/vercel.svg" alt="" width={16} height={14} />
             Deploy Now
           </a>
           <a

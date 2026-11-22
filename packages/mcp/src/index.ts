@@ -1,1 +1,8 @@
-export { DEFAULT_TRANSPORT, assertSafeTransport, isLoopbackHost, type Transport } from './bind';
+export {
+  DEFAULT_TRANSPORT,
+  assertSafeTransport,
+  isLoopbackHost,
+  isLoopbackOrigin,
+  type HttpTransport,
+  type Transport,
+} from './bind';
