@@ -19,18 +19,19 @@ than filled in.
 
 ## Roadmap
 
-| Version | What it is                                                                     |
-| ------- | ------------------------------------------------------------------------------ |
-| v0      | a Claude artifact rendering the four tiles from a local snapshot               |
-| v1      | the Next.js web app in `apps/web`                                              |
-| v1      | a read-only MCP server in `packages/mcp`, so agents can read the same views    |
-| later   | an Expo app in `apps/mobile` (scaffold only today) that reuses `packages/core` |
+| Version | What it is                                                                      |
+| ------- | ------------------------------------------------------------------------------- |
+| v0      | a Claude artifact rendering the four tiles from a local snapshot                |
+| v1      | the Next.js web app in `apps/web`                                               |
+| v1      | a read-only MCP server in `packages/mcp`, so agents can read the same views     |
+| v1      | an Expo app in `apps/mobile` that shows the Attention tile from `packages/core` |
 
 The workspace, tooling and CI are in place, along with the Metro theme, the shared domain model,
 the synthetic fixtures, the v0 artifact (`artifacts/watchman-v0.tsx`), the `npm run snapshot`
 builder that feeds it, and the v1 web dashboard (the home view with the four tiles, their
 drill-downs and layout customisation; see [The web dashboard](#the-web-dashboard)), and the
-read-only MCP server (see [The MCP server](#the-mcp-server)).
+read-only MCP server (see [The MCP server](#the-mcp-server)), and the Expo app's Attention tile (see
+[The mobile app](#the-mobile-app)).
 
 ## Layout
 
@@ -40,7 +41,7 @@ This is one npm-workspaces monorepo (npm only: no pnpm, yarn or bun, and one roo
 | Path            | Package            | What it is                                                                                                                                        |
 | --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/web`      | `@watchman/web`    | Next.js (App Router, TypeScript): the dashboard (home, four drill-downs) on the Chakra UI v3 Metro theme; `/theme` previews the primitives.       |
-| `apps/mobile`   | `@watchman/mobile` | Expo (TypeScript). Scaffold only; it will show the Attention tile.                                                                                |
+| `apps/mobile`   | `@watchman/mobile` | Expo (TypeScript, Expo Router): the Attention tile on a phone, from the synthetic fixture.                                                        |
 | `packages/core` | `@watchman/core`   | The versioned `Snapshot` model and its validation, the Attention ranking and Flow/Spend/Metrics helpers, source adapters and synthetic fixtures.  |
 | `packages/mcp`  | `@watchman/mcp`    | The read-only MCP server: four tools (attention, flow, spend, metrics) over the snapshot, stdio only. Its contract is `packages/mcp/CONTRACT.md`. |
 | `artifacts`     | (not a package)    | `watchman-v0.tsx`, the single-file Claude artifact (v0), and the test that keeps it in step with `packages/core`.                                 |
@@ -53,8 +54,7 @@ from the root `node_modules`, where `apps/web` installs them.
 
 Shared tooling lives at the root: `tsconfig.base.json` (every workspace extends it), one
 `eslint.config.mjs` (typescript-eslint everywhere, plus Next's rules for `apps/web`), one Prettier
-config, and a Vitest config that runs every `packages/*` project, `apps/web` and `artifacts`. `apps/mobile` has
-no test lane yet; it gets one with its first non-starter code (tracked in #6).
+config, and a Vitest config that runs every `packages/*` project, `apps/web`, `apps/mobile` and `artifacts`.
 
 ### The snapshot model
 
@@ -332,6 +332,63 @@ schema with an example call and a synthetic example response, how the filters na
 how to register the server in an MCP client. Its schemas and examples are generated from the running
 server, and a test fails while they differ.
 
+## The mobile app
+
+`apps/mobile` is an Expo app (SDK 58, TypeScript, Expo Router with the one route directory
+`src/app/`) that shows the **Attention tile** on a phone: the items that need the owner's yes,
+ranked by value and urgency, top five, each one tap from where it is acted on. Like every other
+surface it is read-only: the only action is opening an item's link.
+
+It shows, from the committed **synthetic** fixture (`packages/core/fixtures/synthetic/full.json`):
+
+- the headline count of everything waiting, and the five most urgent items below it, numbered;
+- on every item its title, why it waits (needs a decision, blocked, or a pull request over two days
+  old), its project, how long it has waited, its **source and as-of time**, and the host its link
+  opens; tapping a row calls `Linking.openURL` with the item's deep link (a link that cannot be
+  opened shows "Could not open that link", never a silent failure);
+- a **synthetic** badge on the tile (and a **manual** one when a person typed the figures in), and
+  one footer line stamping the tile with every source behind everything waiting and the oldest as-of;
+- a labelled **"No data"** state, in neutral grey with the reason, when the Attention section has no
+  data or the snapshot fails core's validation. It never shows a zero or an invented item.
+
+The look matches the web theme in plain React Native styles: a dark canvas, a flat cobalt tile,
+square corners, a big light figure and a pivot-style header. Each row is a link with a
+whole-sentence accessibility label (title, why it waits, project, wait, source and as-of) and a
+hint naming the host it opens, a 48dp touch target and a visible focus outline for keyboards; the
+tile and its list carry `region` and `list` roles, which Android may use and iOS ignores, so
+nothing depends on them. Body text follows the system text size (the big figures are capped at
+1.2x), and the content keeps a 640dp column on tablets. White on cobalt is 6.2:1; a test keeps every
+text colour at WCAG AA. It was run in the iOS simulator through Expo Go (screenshot in
+[`docs/evidence/p3-mobile`](docs/evidence/p3-mobile/README.md)); not yet checked: Android,
+VoiceOver and TalkBack traversal, the largest text sizes at 320dp, and the focus outline on an Android
+hardware keyboard.
+
+Ranking, validation and provenance are not reimplemented: the app imports `parseSnapshot`,
+`rankAttention` and `combineProvenance` from `@watchman/core` through the npm workspace, and
+`src/lib/attention-view.ts` only turns their output into the words the screen prints (the
+view-model, unit-tested). Expo's Metro config resolves workspace packages on its own, so there is no
+`metro.config.js`. The fixture is bundled, so the app makes no network request and holds no token;
+real snapshots stay server-side, as in the safeguards below.
+
+Run it locally (npm only; no EAS, no cloud build, no account):
+
+```bash
+npm ci
+npm run start:mobile        # Expo dev server; scan the QR code with Expo Go, or press i / a
+npx expo run:ios            # from apps/mobile: a local native build on the iOS simulator (needs Xcode)
+npx expo run:android        # from apps/mobile: a local native build on an Android emulator (needs Android Studio)
+npm run build --workspace @watchman/mobile   # bundle for iOS and Android headless: the build proof
+npx expo-doctor             # from apps/mobile: dependency and config diagnosis
+```
+
+Expo Go needs no native build; open the Expo Go app on a phone on the same network and scan the
+QR code the dev server prints, or press `i` / `a` in that terminal to open a simulator you have
+installed. `ios/` and `android/` are generated on demand and git-ignored. The first `expo run:ios` or
+`run:android` generates them and asks for an iOS bundle identifier or an Android package name, which
+this repository deliberately does not declare (they identify the owner's app); answer the prompt, or
+set `ios.bundleIdentifier` and `android.package` in `apps/mobile/app.json` locally, without committing
+them.
+
 ## Getting started
 
 Requires Node 24 (see `.nvmrc`) and npm 11.
@@ -340,13 +397,15 @@ Requires Node 24 (see `.nvmrc`) and npm 11.
 npm ci              # install every workspace from the root lockfile
 npm run lint        # ESLint + Prettier check
 npm run typecheck   # tsc on the root config, then every workspace (Next route types first)
-npm test            # Vitest across packages/*, apps/web and artifacts
-npm run build       # production build of apps/web
+npm test            # Vitest across packages/*, apps/web, apps/mobile and artifacts
+npm run build       # production build of apps/web, and an Expo export of apps/mobile
 ```
 
 CI runs the same commands on every pull request and on pushes to `main`. The web build needs
 network access: the layout self-hosts Open Sans (the Segoe-like fallback) through
-`next/font/google` at build time.
+`next/font/google` at build time. The mobile build is `expo export` for iOS and Android: it bundles
+the app headless (no simulator, Xcode, Android Studio or account needed) and writes `apps/mobile/dist/`,
+which is git-ignored.
 
 ### Each workspace
 

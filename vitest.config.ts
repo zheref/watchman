@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config';
 // coverage report (nen shu coverage). Both paths are git-ignored.
 export default defineConfig({
   test: {
-    projects: ['packages/*', 'apps/web', 'artifacts'],
+    projects: ['packages/*', 'apps/web', 'apps/mobile', 'artifacts'],
     reporters: ['default', ['junit', { outputFile: '.nen/test-results/vitest.xml' }]],
     coverage: {
       enabled: true,
@@ -14,6 +14,7 @@ export default defineConfig({
         'packages/*/src/**/*.ts',
         'packages/*/scripts/**/*.ts',
         'apps/web/src/**/*.{ts,tsx}',
+        'apps/mobile/src/**/*.{ts,tsx}',
         'artifacts/*.tsx',
       ],
       // Barrels only re-export and test helpers are not product code; any other index.ts that
@@ -28,6 +29,15 @@ export default defineConfig({
         // The root layout is the composition root: it loads next/font, which only runs inside a
         // Next build. It is proved by `next build` and the /theme screenshots (UZF-19 exemption).
         'apps/web/src/app/layout.tsx',
+        // The mobile screen, route files and tile component are React Native views that need the
+        // native runtime, which Vitest's plain-Node project cannot load. Their logic lives in
+        // src/lib (view-model, stamp text, badge rule, link opener) and is measured; what remains
+        // is layout and wiring, proved by `expo export` bundling it for iOS and Android and by a
+        // run in the iOS simulator. A named UZF-19 exemption, tracked in the PR with a follow-up
+        // issue to add a render-test lane (jest-expo and React Native Testing Library).
+        'apps/mobile/src/app/**',
+        'apps/mobile/src/components/**',
+        'apps/mobile/src/theme.ts',
       ],
       reporter: ['text-summary', 'lcov'],
       reportsDirectory: 'coverage',
