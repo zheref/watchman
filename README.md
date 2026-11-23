@@ -29,21 +29,21 @@ than filled in.
 The workspace, tooling and CI are in place, along with the Metro theme, the shared domain model,
 the synthetic fixtures, the v0 artifact (`artifacts/watchman-v0.tsx`), the `npm run snapshot`
 builder that feeds it, and the v1 web dashboard (the home view with the four tiles, their
-drill-downs and layout customisation; see [The web dashboard](#the-web-dashboard)). The MCP server
-lands in a later pull request.
+drill-downs and layout customisation; see [The web dashboard](#the-web-dashboard)), and the
+read-only MCP server (see [The MCP server](#the-mcp-server)).
 
 ## Layout
 
 This is one npm-workspaces monorepo (npm only: no pnpm, yarn or bun, and one root
 `package-lock.json`).
 
-| Path            | Package            | What it is                                                                                                                                       |
-| --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `apps/web`      | `@watchman/web`    | Next.js (App Router, TypeScript): the dashboard (home, four drill-downs) on the Chakra UI v3 Metro theme; `/theme` previews the primitives.      |
-| `apps/mobile`   | `@watchman/mobile` | Expo (TypeScript). Scaffold only; it will show the Attention tile.                                                                               |
-| `packages/core` | `@watchman/core`   | The versioned `Snapshot` model and its validation, the Attention ranking and Flow/Spend/Metrics helpers, source adapters and synthetic fixtures. |
-| `packages/mcp`  | `@watchman/mcp`    | The read-only MCP server. Today: no server and no SDK, only the transport guard that keeps it on stdio or a loopback address, and its tests.     |
-| `artifacts`     | (not a package)    | `watchman-v0.tsx`, the single-file Claude artifact (v0), and the test that keeps it in step with `packages/core`.                                |
+| Path            | Package            | What it is                                                                                                                                        |
+| --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`      | `@watchman/web`    | Next.js (App Router, TypeScript): the dashboard (home, four drill-downs) on the Chakra UI v3 Metro theme; `/theme` previews the primitives.       |
+| `apps/mobile`   | `@watchman/mobile` | Expo (TypeScript). Scaffold only; it will show the Attention tile.                                                                                |
+| `packages/core` | `@watchman/core`   | The versioned `Snapshot` model and its validation, the Attention ranking and Flow/Spend/Metrics helpers, source adapters and synthetic fixtures.  |
+| `packages/mcp`  | `@watchman/mcp`    | The read-only MCP server: four tools (attention, flow, spend, metrics) over the snapshot, stdio only. Its contract is `packages/mcp/CONTRACT.md`. |
+| `artifacts`     | (not a package)    | `watchman-v0.tsx`, the single-file Claude artifact (v0), and the test that keeps it in step with `packages/core`.                                 |
 
 `packages/core/scripts/` holds the one Node entry point, the `npm run snapshot` command. It sits
 outside `src/` (which stays free of platform APIs, as the lint rule enforces) and has its own
@@ -305,6 +305,33 @@ figures in `apps/web/.next/`, which is git-ignored and never committed — and *
 build made with the variable set** (for example with `vercel deploy --prebuilt`): it would ship
 those figures. Deploys build from source, without the variable.
 
+## The MCP server
+
+`packages/mcp` lets agents read the dashboard's four views through the
+[Model Context Protocol](https://modelcontextprotocol.io), built on the official TypeScript SDK
+(v2: `@modelcontextprotocol/server`). It has exactly four tools, `get_attention`, `get_flow`,
+`get_spend` and `get_metrics`, all annotated read-only, and no resources, prompts or write tools; a
+test fails if any other tool is registered. Each tool takes an optional `project` and an optional
+time bound (`since` as ISO 8601 and/or `window` such as `7d`), validated, and answers compact JSON
+whose top level carries `source` and `as_of`. A section nobody reported is an explicit `no_data`
+record with its reason, and a typed-in figure carries `"manual": true`.
+
+It reads what the web app reads, through the same `packages/core` reader: the newest usable
+`snapshot-<ISO>.json` in `WATCHMAN_SNAPSHOT_DIR`, or, with the variable unset, the committed
+synthetic fixture, and then every response says `"synthetic": true`. It makes no network call and
+holds no token. It speaks stdio only: there is no HTTP transport, and the entry refuses to start on
+any other `WATCHMAN_MCP_TRANSPORT`.
+
+```bash
+npm run --silent mcp                         # the server on stdin/stdout (--silent keeps npm's banner off stdout)
+npm run contract --workspace @watchman/mcp   # regenerate CONTRACT.md after changing a tool
+```
+
+[`packages/mcp/CONTRACT.md`](packages/mcp/CONTRACT.md) documents each tool's input and output
+schema with an example call and a synthetic example response, how the filters narrow each view, and
+how to register the server in an MCP client. Its schemas and examples are generated from the running
+server, and a test fails while they differ.
+
 ## Getting started
 
 Requires Node 24 (see `.nvmrc`) and npm 11.
@@ -347,11 +374,10 @@ This repository is public. The rules below apply to every change:
   snapshot paths (`watchman-data/`, `.watchman-private/`, `snapshot-*.json`) are git-ignored.
 - **Tokens stay server-side.** Credentials are supplied through the server environment only and are
   never committed, logged or shipped to a browser bundle. `.env*` files are git-ignored.
-- **The MCP server is never exposed unauthenticated.** It will be read-only, with no write tools,
-  and bind to stdio or a loopback address by default. The server itself lands in a later pull
-  request; today `packages/mcp` holds only the transport guard it must call: stdio by default,
-  and HTTP refused unless it is loopback-bound, requires a server-side bearer token and allows only
-  loopback origins.
+- **The MCP server is never exposed unauthenticated.** It is read-only, with no write tools, and
+  speaks stdio only. Before it serves, its entry passes the transport through the guard in
+  `packages/mcp/src/bind.ts`, which any future HTTP transport must also pass: loopback-bound, a
+  server-side bearer token and loopback-only origins, or the server refuses to start.
 - **The deployed web app sits behind access protection** before any deploy exists (see
   [Deploying](#deploying-owner-only)).
 - **Every pull request is scanned for secrets and PII before it opens.** The author runs the scan on
