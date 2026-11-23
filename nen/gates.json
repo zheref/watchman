@@ -1,0 +1,26 @@
+{
+  "$comment": "Readiness inputs for nen pr ready. One automated reviewer (GitHub Copilot code review), declared kind bot so nen/workflow.json -> aiReviewers optional can waive its round when it does not run; no APPROVED review is required (single maintainer, review-round-only). Delivery PRs are the maintainer's own, on the phase branches the orchestrator cuts (b1-, b2-, p0- .. p3-) or the branch.template prefixes. Nothing excluded. Bootstrap note: this file governs other pull requests only once it is on main (GATE-CONFIGURATION section 5).",
+  "version": 1,
+  "reviewers": [
+    {
+      "name": "copilot",
+      "kind": "bot",
+      "login_pattern": {
+        "pattern": "^(copilot|copilot-pull-request-reviewer(\\[bot\\])?)$",
+        "ignoreCase": true
+      }
+    }
+  ],
+  "approval_policy": "review-round-only",
+  "$approval_policy": "one of: required | review-round-only",
+  "default_approvers": [],
+  "base_reviewers": ["copilot"],
+  "delivery": {
+    "author_pattern": { "pattern": "^zheref$", "ignoreCase": true },
+    "head_ref_prefixes": ["b1-", "b2-", "p0-", "p1-", "p2-", "p3-", "opus/", "sonnet/", "fable/", "haiku/"],
+    "labels": []
+  },
+  "round_policy": { "stallMinutes": 30, "minRounds": 1, "maxRounds": 3 },
+  "checks": { "excluded": [] },
+  "round_quorum": { "any_of": ["copilot"], "minimum": 1 }
+}

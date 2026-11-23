@@ -1,0 +1,19 @@
+node_modules/
+package-lock.json
+.next/
+out/
+build/
+dist/
+coverage/
+.expo/
+web-build/
+apps/web/next-env.d.ts
+nen/
+.nen/
+Reports/
+.claude/
+# Rendered by hatsu:tenkai; must stay byte-identical to the rendering (an edit reads as drift).
+scripts/readiness_ci_verdict.mts
+scripts/consumer_trailer_ci.mts
+.github/workflows/pr-readiness.yml
+.github/workflows/forbidden-commit-trailers.yml

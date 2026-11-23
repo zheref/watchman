@@ -1,0 +1,70 @@
+# --- Public-repo safeguards: never commit local-only or real data -------------
+# Local agent worktrees
+.claude/worktrees/
+# Environment files, tokens and credentials (all variants)
+.env*
+*.env
+.npmrc
+credentials*.json
+.claude/settings.local.json
+.mcp.json
+google-services.json
+GoogleService-Info.plist
+# Vercel project link
+.vercel
+# Local-only session notes
+HANDOFF.md
+STATUS.md
+# Local data snapshots (real data lives outside the repo; see WATCHMAN_SNAPSHOT_DIR)
+.watchman-private/
+watchman-data/
+snapshot-*.json
+snapshots/
+
+# --- Dependencies ----------------------------------------------------------------
+node_modules/
+# One lockfile only: the root package-lock.json. Other package managers are not used.
+yarn.lock
+pnpm-lock.yaml
+bun.lock
+bun.lockb
+.pnp
+.pnp.*
+.yarn/
+
+# --- Build and tool output ---------------------------------------------------------
+# Next.js
+.next/
+out/
+next-env.d.ts
+# Expo / Metro
+.expo/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+/apps/mobile/ios/
+/apps/mobile/android/
+# Generic
+build/
+dist/
+coverage/
+*.tsbuildinfo
+
+# --- Signing material ------------------------------------------------------------
+*.pem
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# --- Logs and OS noise -------------------------------------------------------------
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.DS_Store
+# nen writes generated output here; committed configuration lives in nen/.
+.nen/
+# nen/workflow.json's reports.dir -- generated reports, never committed.
+Reports/

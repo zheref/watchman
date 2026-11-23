@@ -1,0 +1,28 @@
+{
+  "$comment": "Issue-routing registry for this product repository and the tool repositories it consumes. nen refuses to guess a taxonomy: role, kind and gate are read from here. WM is this repository's product code; HA and NN route Hatsu and nen issues.",
+  "consumers": [
+    {
+      "repo": "zheref/watchman",
+      "role": "Watchman -- a single-user, read-only executive dashboard (Next.js web, read-only MCP server, Expo scaffold, shared core) in one npm-workspaces monorepo",
+      "kind": "product",
+      "gate": "G2",
+      "consumes": ["zheref/hatsu", "zheref/nen"],
+      "scenario": "react-uzf-v1"
+    }
+  ],
+  "maintained_tools": [
+    {
+      "repo": "zheref/hatsu",
+      "role": "Hatsu workflow and skill prose"
+    },
+    {
+      "repo": "zheref/nen",
+      "role": "Shared deterministic machinery"
+    }
+  ],
+  "product_codes": {
+    "WM": "zheref/watchman",
+    "HA": "zheref/hatsu",
+    "NN": "zheref/nen"
+  }
+}
