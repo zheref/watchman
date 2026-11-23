@@ -1,0 +1,83 @@
+{
+  "$comment": "SYNTHETIC fixture: partial coverage, a manual entry and a metrics section with values, to exercise every shape. No real data.",
+  "schema_version": 1,
+  "synthetic": true,
+  "generated_at": "2026-01-14T15:00:00Z",
+  "attention": {
+    "state": "value",
+    "source": "manual entry",
+    "as_of": "2026-01-14T08:00:00Z",
+    "manual": true,
+    "candidates": [
+      {
+        "id": "manual-1",
+        "kind": "owner_decision",
+        "title": "Sample decision typed in by hand",
+        "project": "Project Alpha",
+        "url": "https://example.com/alpha/decisions/9",
+        "value": 3,
+        "waiting_since": "2026-01-10T08:00:00Z",
+        "manual": true,
+        "source": "manual entry",
+        "as_of": "2026-01-14T08:00:00Z"
+      }
+    ]
+  },
+  "flow": {
+    "state": "no_data",
+    "reason": "forge adapter not configured",
+    "source": "synthetic",
+    "as_of": "2026-01-14T15:00:00Z"
+  },
+  "spend": {
+    "state": "value",
+    "source": "synthetic",
+    "as_of": "2026-01-14T14:00:00Z",
+    "providers": [
+      {
+        "id": "sample-a",
+        "label": "Sample Provider A",
+        "quota": {
+          "state": "no_data",
+          "reason": "usage reading not yet available",
+          "source": "synthetic-usage",
+          "as_of": "2026-01-14T14:00:00Z"
+        },
+        "monthly_cost": {
+          "state": "no_data",
+          "reason": "billing export not yet available",
+          "source": "synthetic-billing",
+          "as_of": "2026-01-14T14:00:00Z"
+        }
+      }
+    ]
+  },
+  "metrics": {
+    "state": "value",
+    "source": "synthetic-scorecard",
+    "as_of": "2026-01-14T12:00:00Z",
+    "projects": [
+      {
+        "project": "Project Alpha",
+        "metrics": {
+          "Visibility": {
+            "state": "value",
+            "unit": "score",
+            "points": [
+              { "at": "2026-01-07T12:00:00Z", "value": 60 },
+              { "at": "2026-01-14T12:00:00Z", "value": 70 }
+            ],
+            "source": "synthetic-scorecard",
+            "as_of": "2026-01-14T12:00:00Z"
+          },
+          "Efficiency": {
+            "state": "no_data",
+            "reason": "not scored this week",
+            "source": "synthetic-scorecard",
+            "as_of": "2026-01-14T12:00:00Z"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,318 @@
+{
+  "$comment": "SYNTHETIC fixture: invented projects, round invented figures and example.com links. No real data.",
+  "schema_version": 1,
+  "synthetic": true,
+  "generated_at": "2026-01-14T15:00:00Z",
+  "attention": {
+    "state": "value",
+    "source": "synthetic",
+    "as_of": "2026-01-14T14:30:00Z",
+    "candidates": [
+      {
+        "id": "alpha-decision-1",
+        "kind": "owner_decision",
+        "title": "Approve the sample onboarding copy",
+        "project": "Project Alpha",
+        "url": "https://example.com/alpha/decisions/1",
+        "value": 5,
+        "waiting_since": "2026-01-12T15:00:00Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "orchard-card-7",
+        "kind": "blocked_card",
+        "title": "Card blocked on a layout call",
+        "project": "Sample Orchard",
+        "url": "https://example.com/orchard/cards/7",
+        "value": 4,
+        "waiting_since": "2026-01-08T15:00:00Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "alpha-pr-12",
+        "kind": "waiting_pr",
+        "title": "Demo widget refactor",
+        "project": "Project Alpha",
+        "url": "https://example.com/alpha/pulls/12",
+        "value": 3,
+        "waiting_since": "2026-01-11T15:00:00Z",
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "lighthouse-pr-3",
+        "kind": "waiting_pr",
+        "title": "Placeholder docs tweak",
+        "project": "Demo Lighthouse",
+        "url": "https://example.com/lighthouse/pulls/3",
+        "value": 2,
+        "waiting_since": "2026-01-13T15:00:00Z",
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "lighthouse-decision-2",
+        "kind": "owner_decision",
+        "title": "Pick a name for the demo release",
+        "project": "Demo Lighthouse",
+        "url": "https://example.com/lighthouse/decisions/2",
+        "value": 2,
+        "waiting_since": "2026-01-14T09:00:00Z",
+        "due_at": "2026-01-14T20:00:00Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "orchard-card-2",
+        "kind": "blocked_card",
+        "title": "Sample card waiting on a stub service",
+        "project": "Sample Orchard",
+        "url": "https://example.com/orchard/cards/2",
+        "value": 1,
+        "waiting_since": "2026-01-04T15:00:00Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "alpha-decision-4",
+        "kind": "owner_decision",
+        "title": "Choose between two sample colour options",
+        "project": "Project Alpha",
+        "url": "https://example.com/alpha/decisions/4",
+        "value": 3,
+        "waiting_since": "2026-01-13T03:00:00Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      }
+    ]
+  },
+  "flow": {
+    "state": "value",
+    "source": "synthetic",
+    "as_of": "2026-01-14T14:30:00Z",
+    "projects": [
+      {
+        "project": "Project Alpha",
+        "open_prs": 4,
+        "open_issues": 10,
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "project": "Sample Orchard",
+        "open_prs": 2,
+        "open_issues": 6,
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "project": "Demo Lighthouse",
+        "open_prs": 0,
+        "open_issues": 3,
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      }
+    ],
+    "work_items": [
+      {
+        "id": "alpha-pr-10",
+        "project": "Project Alpha",
+        "kind": "pr",
+        "title": "Sample settings screen",
+        "url": "https://example.com/alpha/pulls/10",
+        "opened_at": "2026-01-06T10:00:00Z",
+        "updated_at": "2026-01-12T11:00:00Z",
+        "completed_at": "2026-01-12T11:00:00Z",
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "alpha-pr-11",
+        "project": "Project Alpha",
+        "kind": "pr",
+        "title": "Demo empty state",
+        "url": "https://example.com/alpha/pulls/11",
+        "opened_at": "2026-01-09T10:00:00Z",
+        "updated_at": "2026-01-13T16:00:00Z",
+        "completed_at": "2026-01-13T16:00:00Z",
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "orchard-issue-20",
+        "project": "Sample Orchard",
+        "kind": "issue",
+        "title": "Placeholder bug",
+        "url": "https://example.com/orchard/issues/20",
+        "opened_at": "2026-01-07T10:00:00Z",
+        "updated_at": "2026-01-14T09:00:00Z",
+        "completed_at": "2026-01-14T09:00:00Z",
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "orchard-pr-5",
+        "project": "Sample Orchard",
+        "kind": "pr",
+        "title": "Sample import cleanup",
+        "url": "https://example.com/orchard/pulls/5",
+        "opened_at": "2026-01-02T10:00:00Z",
+        "updated_at": "2026-01-07T10:00:00Z",
+        "completed_at": "2026-01-07T10:00:00Z",
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "lighthouse-issue-8",
+        "project": "Demo Lighthouse",
+        "kind": "issue",
+        "title": "Demo typo",
+        "url": "https://example.com/lighthouse/issues/8",
+        "opened_at": "2026-01-03T10:00:00Z",
+        "updated_at": "2026-01-09T10:00:00Z",
+        "completed_at": "2026-01-09T10:00:00Z",
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "alpha-issue-31",
+        "project": "Project Alpha",
+        "kind": "issue",
+        "title": "Sample flaky check",
+        "url": "https://example.com/alpha/issues/31",
+        "opened_at": "2026-01-02T10:00:00Z",
+        "updated_at": "2026-01-05T10:00:00Z",
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "orchard-card-9",
+        "project": "Sample Orchard",
+        "kind": "card",
+        "title": "Sample card parked in review",
+        "url": "https://example.com/orchard/cards/9",
+        "opened_at": "2026-01-05T10:00:00Z",
+        "updated_at": "2026-01-10T10:00:00Z",
+        "source": "synthetic-board",
+        "as_of": "2026-01-14T14:30:00Z"
+      },
+      {
+        "id": "alpha-pr-13",
+        "project": "Project Alpha",
+        "kind": "pr",
+        "title": "Demo tile spacing",
+        "url": "https://example.com/alpha/pulls/13",
+        "opened_at": "2026-01-13T10:00:00Z",
+        "updated_at": "2026-01-14T12:00:00Z",
+        "source": "synthetic-forge",
+        "as_of": "2026-01-14T14:30:00Z"
+      }
+    ],
+    "board": {
+      "state": "value",
+      "source": "synthetic-board",
+      "as_of": "2026-01-14T14:30:00Z",
+      "columns": [
+        { "name": "Backlog", "count": 6 },
+        { "name": "In progress", "count": 3 },
+        { "name": "Blocked", "count": 2 },
+        { "name": "Done", "count": 10 }
+      ]
+    }
+  },
+  "spend": {
+    "state": "value",
+    "source": "synthetic",
+    "as_of": "2026-01-14T14:00:00Z",
+    "providers": [
+      {
+        "id": "sample-a",
+        "label": "Sample Provider A",
+        "quota": {
+          "state": "value",
+          "used": 40,
+          "limit": 100,
+          "unit": "percent",
+          "resets_at": "2026-01-19T00:00:00Z",
+          "source": "synthetic-usage",
+          "as_of": "2026-01-14T14:00:00Z"
+        },
+        "monthly_cost": {
+          "state": "value",
+          "month": "2026-01",
+          "usd": 20,
+          "cop": 80000,
+          "source": "synthetic-billing",
+          "as_of": "2026-01-14T14:00:00Z"
+        }
+      },
+      {
+        "id": "sample-b",
+        "label": "Sample Provider B",
+        "quota": {
+          "state": "value",
+          "used": 300,
+          "limit": 500,
+          "unit": "messages",
+          "resets_at": "2026-01-16T12:00:00Z",
+          "source": "synthetic-usage",
+          "as_of": "2026-01-14T14:00:00Z"
+        },
+        "monthly_cost": {
+          "state": "no_data",
+          "reason": "billing export not available for this provider",
+          "source": "synthetic-billing",
+          "as_of": "2026-01-14T14:00:00Z"
+        }
+      },
+      {
+        "id": "sample-c",
+        "label": "Sample Provider C",
+        "quota": {
+          "state": "no_data",
+          "reason": "provider exposes no usage reading",
+          "source": "synthetic-usage",
+          "as_of": "2026-01-14T14:00:00Z"
+        },
+        "monthly_cost": {
+          "state": "value",
+          "month": "2026-01",
+          "usd": 10,
+          "cop": 40000,
+          "manual": true,
+          "source": "manual entry",
+          "as_of": "2026-01-13T12:00:00Z"
+        }
+      },
+      {
+        "id": "sample-d",
+        "label": "Sample Provider D",
+        "quota": {
+          "state": "value",
+          "used": 90,
+          "limit": 100,
+          "unit": "percent",
+          "resets_at": "2026-01-13T00:00:00Z",
+          "source": "synthetic-usage",
+          "as_of": "2026-01-14T14:00:00Z"
+        },
+        "monthly_cost": {
+          "state": "value",
+          "month": "2026-01",
+          "usd": 30,
+          "cop": 120000,
+          "source": "synthetic-billing",
+          "as_of": "2026-01-14T14:00:00Z"
+        }
+      }
+    ]
+  },
+  "metrics": {
+    "state": "no_data",
+    "reason": "no scorecard source exists yet",
+    "source": "synthetic",
+    "as_of": "2026-01-14T15:00:00Z"
+  }
+}
