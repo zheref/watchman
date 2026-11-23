@@ -161,6 +161,22 @@ export type MetricsSection = z.infer<typeof metricsSectionSchema>;
 export const SECTION_KEYS = ['attention', 'flow', 'spend', 'metrics'] as const;
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
+/** How one source fared when the snapshot was built. */
+export const SOURCE_STATUSES = ['value', 'no_data', 'failed'] as const;
+
+/**
+ * One source's outcome, written by `npm run snapshot` so a reader can tell a complete section
+ * from one merged without a source that failed or had no data: `feeds` names the sections the
+ * source reports when it works, `reason` says why it has no data or failed.
+ */
+export const sourceStatusSchema = z.strictObject({
+  adapter: label,
+  status: z.enum(SOURCE_STATUSES),
+  feeds: z.array(z.enum(SECTION_KEYS)),
+  reason: label.max(300).optional(),
+});
+export type SourceStatusRecord = z.infer<typeof sourceStatusSchema>;
+
 export const snapshotSchema = z.strictObject({
   /** Free-text note for people reading the file; ignored by every reader. */
   $comment: z.string().optional(),
@@ -169,6 +185,14 @@ export const snapshotSchema = z.strictObject({
   generated_at: isoDateTime,
   /** `true` on every committed fixture. Real snapshots omit it. */
   synthetic: z.boolean().optional(),
+  /** The owner's offset from UTC in minutes, for where weeks and months start; UTC when absent. */
+  utc_offset_minutes: z
+    .int()
+    .min(-14 * 60)
+    .max(14 * 60)
+    .optional(),
+  /** Every source the builder ran and how it fared; absent in hand-made snapshots. */
+  sources: z.array(sourceStatusSchema).optional(),
   attention: attentionSectionSchema,
   flow: flowSectionSchema,
   spend: spendSectionSchema,

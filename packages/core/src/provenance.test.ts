@@ -24,6 +24,16 @@ describe('deepLink', () => {
 });
 
 describe('combineProvenance', () => {
+  it('names each part of an already-combined source once', () => {
+    expect(
+      combineProvenance([
+        { source: 'github + manual:a.json', as_of: '2026-01-14T10:00:00Z' },
+        { source: 'github', as_of: '2026-01-14T11:00:00Z' },
+        { source: 'manual:a.json', as_of: '2026-01-14T12:00:00Z' },
+      ]).source,
+    ).toBe('github + manual:a.json');
+  });
+
   it('names every source once, keeps the oldest stamp and any manual mark', () => {
     expect(
       combineProvenance([

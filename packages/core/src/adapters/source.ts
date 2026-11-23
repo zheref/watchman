@@ -45,6 +45,8 @@ export interface PartialSnapshot {
 export interface SourceAdapter {
   /** Stable, unique id, e.g. `github`, `handoff-board`, `file`. */
   readonly id: string;
+  /** The sections this source reports when it works, so a failure can be traced to them. */
+  readonly feeds?: readonly SectionKey[];
   fetch(context: SourceAdapterContext): Promise<PartialSnapshot>;
 }
 

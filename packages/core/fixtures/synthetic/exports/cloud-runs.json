@@ -1,0 +1,30 @@
+{
+  "$comment": "SYNTHETIC example of the cloud-runs tracker export: invented runs and example.com links. No real data.",
+  "synthetic": true,
+  "export": "cloud-runs",
+  "version": 1,
+  "as_of": "2026-01-14T12:00:00Z",
+  "items": [
+    {
+      "id": "run-1",
+      "title": "Sample run halted on a failing check",
+      "project": "Demo Lighthouse",
+      "url": "https://example.com/tracker/runs/1",
+      "status": "Halted",
+      "blocked": true,
+      "value": 2,
+      "opened_at": "2026-01-12T10:00:00Z",
+      "updated_at": "2026-01-12T18:00:00Z"
+    },
+    {
+      "id": "run-2",
+      "title": "Sample run completed",
+      "project": "Project Alpha",
+      "url": "https://example.com/tracker/runs/2",
+      "status": "Done",
+      "opened_at": "2026-01-13T10:00:00Z",
+      "updated_at": "2026-01-13T12:00:00Z",
+      "completed_at": "2026-01-13T12:00:00Z"
+    }
+  ]
+}
