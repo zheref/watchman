@@ -1,10 +1,10 @@
 import { describeAge, formatAsOf, assertSnapshot } from '@watchman/core';
 import fixture from '@watchman/core/fixtures/synthetic/full.json';
 import type { Metadata } from 'next';
-import { PageShell, PivotHeader, Tile, TileGrid } from '@/components/metro';
+import { PageShell, PivotHeader, Tile, TileGrid, TileList } from '@/components/metro';
 import { attentionView, flowView, metricsView, plural, spendView } from '@/lib/tiles';
 import { ACCENTS, ACCENT_NAMES, TILE_FG, contrastRatio } from '@/theme/palette';
-import { Section, Specimen, TileList } from './parts';
+import { Section, Specimen } from './parts';
 
 export const metadata: Metadata = {
   title: 'Theme preview · Watchman',

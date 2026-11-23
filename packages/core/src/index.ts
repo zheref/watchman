@@ -6,6 +6,7 @@ export * from './attention';
 export * from './flow';
 export * from './spend';
 export * from './metrics';
+export * from './gaps';
 export * from './adapters/source';
 export * from './adapters/file';
 export * from './adapters/gh';

@@ -7,7 +7,12 @@ import {
   SnapshotValidationError,
   collectSnapshot,
   createFileSnapshotAdapter,
+  latestSnapshotFileName,
+  parseSnapshotText,
+  readLatestSnapshot,
+  type SnapshotDirReader,
   resolveSnapshotDir,
+  snapshotFileName,
 } from '../index';
 import { NOW } from '../test/builders';
 
@@ -127,5 +132,143 @@ describe('createFileSnapshotAdapter', () => {
     expect(() =>
       createFileSnapshotAdapter({ dir: '  ', readText: () => Promise.resolve('') }),
     ).toThrow(RangeError);
+  });
+});
+
+describe('latestSnapshotFileName', () => {
+  it('picks the newest snapshot-<ISO>.json and ignores every other name', () => {
+    expect(
+      latestSnapshotFileName([
+        'snapshot-2026-11-22T19-07-28Z.json',
+        'watchman.config.json',
+        'snapshot-2026-11-23T08-00-00Z.json',
+        'snapshot.json',
+        'snapshot-2026-11-23T08-00-00Z.json.tmp',
+        'snapshot-latest.json',
+        'snapshot-2026-11-21T23-59-59Z.json',
+      ]),
+    ).toBe('snapshot-2026-11-23T08-00-00Z.json');
+  });
+
+  it('is null when no file matches', () => {
+    expect(latestSnapshotFileName([])).toBeNull();
+    expect(latestSnapshotFileName(['snapshot.json', 'notes.txt'])).toBeNull();
+  });
+
+  it('accepts exactly what the builder writes', () => {
+    const name = snapshotFileName(new Date('2026-11-22T19:07:28.458Z'));
+    expect(latestSnapshotFileName([name])).toBe(name);
+  });
+});
+
+describe('parseSnapshotText', () => {
+  it('returns the whole validated snapshot, sources and offset included', () => {
+    const snapshot = parseSnapshotText(JSON.stringify(fullFixture), 'file:x.json');
+    expect(snapshot.generated_at).toBe('2026-01-14T15:00:00Z');
+    expect(snapshot.synthetic).toBe(true);
+  });
+
+  it('names the source, never the text, on bad JSON or an invalid snapshot', () => {
+    expect(() => parseSnapshotText('{"secret": ', 'file:x.json')).toThrow(
+      new SnapshotSourceError('file:x.json: not valid JSON'),
+    );
+    expect(() => parseSnapshotText('{"schema_version": 1}', 'file:x.json')).toThrow(
+      SnapshotValidationError,
+    );
+  });
+});
+
+describe('readLatestSnapshot', () => {
+  const good = JSON.stringify(fullFixture);
+  const dirReader = (
+    files: Record<string, string | Error>,
+    listError?: Error,
+  ): SnapshotDirReader & { reads: string[] } => {
+    const reads: string[] = [];
+    return {
+      reads,
+      list: () => (listError ? Promise.reject(listError) : Promise.resolve(Object.keys(files))),
+      readText: (path) => {
+        reads.push(path);
+        const value = files[path.split('/').pop()!];
+        return value instanceof Error || value === undefined
+          ? Promise.reject(value ?? new Error('missing'))
+          : Promise.resolve(value);
+      },
+    };
+  };
+  const coded = (code: string) => Object.assign(new Error(`${code} /secret/dir`), { code });
+
+  it('reads the newest snapshot-<ISO>.json and names it by file only', async () => {
+    const reader = dirReader({
+      'snapshot-2026-01-14T14-00-00Z.json': good,
+      'snapshot-2026-01-14T15-00-00Z.json': good,
+      'snapshot.json': good,
+      'notes.txt': 'x',
+    });
+    const result = await readLatestSnapshot('/secret/dir/', reader);
+    expect(result).toMatchObject({ ok: true, source: 'file:snapshot-2026-01-14T15-00-00Z.json' });
+    expect(reader.reads).toEqual(['/secret/dir/snapshot-2026-01-14T15-00-00Z.json']);
+  });
+
+  it('falls back past a broken newest file and lists what it skipped, path-free', async () => {
+    const result = await readLatestSnapshot(
+      '/secret/dir',
+      dirReader({
+        'snapshot-2026-01-14T16-00-00Z.json': '{"half": ',
+        'snapshot-2026-01-14T15-00-00Z.json': JSON.stringify({ ...fullFixture, schema_version: 9 }),
+        'snapshot-2026-01-14T14-00-00Z.json': good,
+      }),
+    );
+    expect(result).toMatchObject({ ok: true, source: 'file:snapshot-2026-01-14T14-00-00Z.json' });
+    expect(result.skipped.map((s) => s.problem)).toEqual([
+      'file:snapshot-2026-01-14T16-00-00Z.json: not valid JSON',
+      'file:snapshot-2026-01-14T15-00-00Z.json: not a valid snapshot (1 problem at schema_version)',
+    ]);
+    expect(JSON.stringify(result)).not.toMatch(/secret|"9"| 9/);
+  });
+
+  it('uses a hand-placed snapshot.json when no snapshot-<ISO>.json exists', async () => {
+    const result = await readLatestSnapshot('/d', dirReader({ 'snapshot.json': good }));
+    expect(result).toMatchObject({ ok: true, source: 'file:snapshot.json' });
+  });
+
+  it('reports why nothing could be shown, with codes only', async () => {
+    expect(await readLatestSnapshot('/secret/dir', dirReader({}, coded('EACCES')))).toEqual({
+      ok: false,
+      problem: 'the snapshot directory could not be listed (EACCES)',
+      skipped: [],
+    });
+    expect(await readLatestSnapshot('/d', dirReader({}, new Error('odd')))).toMatchObject({
+      problem: 'the snapshot directory could not be listed',
+    });
+    expect(await readLatestSnapshot('/d', dirReader({ 'a.txt': '' }))).toMatchObject({
+      ok: false,
+      problem: 'no snapshot-*.json or snapshot.json in the snapshot directory yet',
+    });
+    const unreadable = await readLatestSnapshot(
+      '/secret/dir',
+      dirReader({
+        'snapshot.json': coded('EISDIR'),
+        'snapshot-2026-01-14T15-00-00Z.json': new Error('x'),
+      }),
+    );
+    expect(unreadable).toMatchObject({
+      ok: false,
+      problem: 'file:snapshot-2026-01-14T15-00-00Z.json: could not be read',
+    });
+    expect(unreadable.skipped[1]?.problem).toBe('file:snapshot.json: could not be read (EISDIR)');
+  });
+
+  it('tries at most three snapshot files, then snapshot.json', async () => {
+    const files: Record<string, string> = { 'snapshot.json': '{' };
+    for (const h of ['10', '11', '12', '13']) files[`snapshot-2026-01-14T${h}-00-00Z.json`] = '{';
+    const result = await readLatestSnapshot('/d', dirReader(files));
+    expect(result.skipped.map((s) => s.source)).toEqual([
+      'file:snapshot-2026-01-14T13-00-00Z.json',
+      'file:snapshot-2026-01-14T12-00-00Z.json',
+      'file:snapshot-2026-01-14T11-00-00Z.json',
+      'file:snapshot.json',
+    ]);
   });
 });

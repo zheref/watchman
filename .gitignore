@@ -44,6 +44,9 @@ expo-env.d.ts
 .metro-health-check*
 /apps/mobile/ios/
 /apps/mobile/android/
+# Playwright (apps/web e2e) output
+apps/web/e2e/.results/
+playwright-report/
 # Generic
 build/
 dist/

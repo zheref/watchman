@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fullFixture from '../fixtures/synthetic/full.json';
 import {
+  countNotYetEligible,
   ATTENTION_LIMIT,
   assertSnapshot,
   isEligible,
@@ -133,5 +134,23 @@ describe('rankAttention', () => {
 
   it('returns nothing for nothing', () => {
     expect(rankAttention([], NOW)).toEqual([]);
+  });
+});
+
+describe('countNotYetEligible', () => {
+  it('counts distinct pull requests that have not waited 48 hours, first report winning', () => {
+    const fresh = candidate({
+      id: 'pr-1',
+      kind: 'waiting_pr',
+      waiting_since: '2026-01-14T00:00:00Z',
+    });
+    const old = candidate({
+      id: 'pr-2',
+      kind: 'waiting_pr',
+      waiting_since: '2026-01-01T00:00:00Z',
+    });
+    const decision = candidate({ id: 'd-1', waiting_since: '2026-01-14T14:00:00Z' });
+    expect(countNotYetEligible([fresh, fresh, old, decision, { ...old, id: 'pr-1' }], NOW)).toBe(1);
+    expect(countNotYetEligible([], NOW)).toBe(0);
   });
 });
