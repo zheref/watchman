@@ -53,7 +53,8 @@ tsconfig; whether it should become its own package is part of the topology quest
 from the root `node_modules`, where `apps/web` installs them.
 
 Shared tooling lives at the root: `tsconfig.base.json` (every workspace extends it), one
-`eslint.config.mjs` (typescript-eslint everywhere, plus Next's rules for `apps/web`), one Prettier
+`eslint.config.mjs` (typescript-eslint everywhere, plus Next's rules for `apps/web` and the same
+React hooks rules for `apps/mobile`), one Prettier
 config, and a Vitest config that runs every `packages/*` project, `apps/web`, `apps/mobile` and `artifacts`.
 
 ### The snapshot model
@@ -358,7 +359,10 @@ hint naming the host it opens, a 48dp touch target and a visible focus outline f
 tile and its list carry `region` and `list` roles, which Android may use and iOS ignores, so
 nothing depends on them. Body text follows the system text size (the big figures are capped at
 1.2x), and the content keeps a 640dp column on tablets. White on cobalt is 6.2:1; a test keeps every
-text colour at WCAG AA. It was run in the iOS simulator through Expo Go (screenshot in
+text colour at WCAG AA. Render tests draw the screen and the tile through `react-native-web` in
+`npm test` and check the value, "No data", manual and link-failed states by role and accessible name
+(the link-failed message is an assertive live region and is announced); they prove the components'
+logic and labels, not native layout. It was run in the iOS simulator through Expo Go (screenshot in
 [`docs/evidence/p3-mobile`](docs/evidence/p3-mobile/README.md)); not yet checked: Android,
 VoiceOver and TalkBack traversal, the largest text sizes at 320dp, and the focus outline on an Android
 hardware keyboard.

@@ -29,15 +29,8 @@ export default defineConfig({
         // The root layout is the composition root: it loads next/font, which only runs inside a
         // Next build. It is proved by `next build` and the /theme screenshots (UZF-19 exemption).
         'apps/web/src/app/layout.tsx',
-        // The mobile screen, route files and tile component are React Native views that need the
-        // native runtime, which Vitest's plain-Node project cannot load. Their logic lives in
-        // src/lib (view-model, stamp text, badge rule, link opener) and is measured; what remains
-        // is layout and wiring, proved by `expo export` bundling it for iOS and Android and by a
-        // run in the iOS simulator. A named UZF-19 exemption, tracked in the PR with a follow-up
-        // issue to add a render-test lane (jest-expo and React Native Testing Library).
-        'apps/mobile/src/app/**',
-        'apps/mobile/src/components/**',
-        'apps/mobile/src/theme.ts',
+        // The mobile views (src/app, src/components, theme.ts) are measured: apps/mobile's render
+        // lane draws them through react-native-web under happy-dom (zheref/watchman#16).
       ],
       reporter: ['text-summary', 'lcov'],
       reportsDirectory: 'coverage',

@@ -23,6 +23,11 @@ removed. Before writing any code that touches an Expo or React Native API:
   routes live only in `src/app/` with its `_layout.tsx`. Keep screens thin: logic goes in
   `src/lib/` as pure, unit-tested modules (the Vitest project runs `src/**/*.test.ts` in plain Node,
   so a tested module must not import `react-native`).
+- **Views are render-tested.** `src/**/*.test.tsx` is the render lane: happy-dom, with
+  `react-native` resolved to `react-native-web` (`vitest.config.mts`), queried with
+  `@testing-library/react` by role and accessible name. Nothing in `src/app/` may be a test (every
+  file there is a route), so route files are tested from `src/routes.test.tsx`. Coverage measures
+  `src/app` and `src/components` in the root report; they are not exempt.
 - **No `metro.config.js`.** Expo's Metro config handles npm workspaces itself (SDK 52+); add one only
   for a need it cannot meet.
 - **Read-only, public repository.** No secrets, tokens or real data in this app's code or assets.

@@ -27,3 +27,6 @@ shows and how it reuses `packages/core`.
 - `src/lib/open-link.ts` opens a deep link through an injected opener and reports the outcome; pure and unit-tested.
 - `src/lib/load-attention.ts` reads the bundled synthetic fixture through core's validation.
 - `src/palette.ts` and `src/theme.ts` are the Metro colours, type scale and spacing.
+- `src/**/*.test.tsx` is the render lane: the screen, the tile and the route files drawn through
+  `react-native-web` under happy-dom and queried by role and accessible name (value, "No data",
+  manual and link-failed states). It runs in `npm test` with no simulator or device.

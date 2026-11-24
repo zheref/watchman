@@ -9,6 +9,8 @@ screen of the app, not scrolled. The simulator's status-bar clock is the host's.
 | -------------------- | --------- | -------------------------------------------------------- |
 | `attention-iphone15` | iPhone 15 | [attention-ios-iphone15.png](attention-ios-iphone15.png) |
 
-Not captured here: the Android emulator, 320 dp width, the largest text sizes, the "No data",
-"manual" and link-failed states (none is reachable from the bundled fixture without a render
-harness), and screen-reader traversal.
+Not captured here: the Android emulator, 320 dp width, the largest text sizes, and screen-reader
+traversal. The "No data", "manual" and link-failed states are not reachable from the bundled fixture
+in the app; the render tests in `apps/mobile/src/components/AttentionTile.test.tsx` draw each of them
+(through `react-native-web`, not a native screen). The bundle measurement is in
+[`../p3-mobile-bundle`](../p3-mobile-bundle/README.md).
