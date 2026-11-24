@@ -4,40 +4,21 @@ import {
   formatAsOf,
   parseSnapshot,
   rankAttention,
-  type AttentionKind,
   type Provenance,
   type Snapshot,
 } from '@watchman/core';
+import { KIND_LABEL, linkDestination, waitedLabel } from '@watchman/ui';
 
 /**
  * What the Attention tile shows, as plain data. Ranking, validation and provenance all come from
  * `@watchman/core` (`parseSnapshot`, `rankAttention`, `combineProvenance`); this file only turns
  * their output into the words and figures the screen prints, so the screen itself holds no logic.
+ * The words themselves (`KIND_LABEL`, `waitedLabel`, `linkDestination`) are the shared ones in
+ * `@watchman/ui`, the same the web dashboard prints.
  *
  * Pure: the same input gives the same view. `now` is the snapshot's own `generated_at` (as the
  * web dashboard does), so a fixture ranks the same on every day it is opened.
  */
-
-/** Plain words for why an item waits on the owner (the web dashboard uses the same words). */
-export const KIND_LABEL: Record<AttentionKind, string> = {
-  owner_decision: 'Needs your decision',
-  blocked_card: 'Blocked',
-  waiting_pr: 'Review waiting over 2 days',
-};
-
-/** `30h` under two days, `3d` from there. */
-export function waitedLabel(hours: number): string {
-  return hours < 48 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
-}
-
-/**
- * The host a deep link opens, for its visible text. Parsed by hand: React Native's `URL` has
- * historically lacked `hostname`, and core has already restricted every link to `https` and a
- * dotted host name.
- */
-export function linkHost(url: string): string {
-  return /^https:\/\/([^/?#:]+)/i.exec(url)?.[1]?.toLowerCase() ?? '';
-}
 
 export interface StampView {
   source: string;
@@ -71,6 +52,7 @@ export interface AttentionItemView {
   waited: string;
   /** The deep link, opened with `Linking.openURL`. */
   url: string;
+  /** What the link opens, for its visible text: the host, or `another site` if it cannot be read. */
   host: string;
   stamp: StampView;
   /** One sentence a screen reader says for the whole row. */
@@ -145,7 +127,7 @@ export function attentionTile(
       kindLabel,
       waited,
       url: item.url,
-      host: linkHost(item.url),
+      host: linkDestination(item.url),
       stamp,
       accessibilityLabel:
         `Number ${index + 1}: ${item.title}. ${kindLabel}, ${item.project}, waiting ${waited}. ` +

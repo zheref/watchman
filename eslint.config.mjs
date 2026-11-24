@@ -50,4 +50,22 @@ export default defineConfig([
       ],
     },
   },
+  {
+    // packages/ui is the shared presentation layer: words and small formatters printed by both
+    // apps, on Node, in the browser and on Hermes. It stays as framework-blind as core.
+    files: ['packages/ui/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['node:*', 'next', 'next/*', 'expo', 'expo-*', 'react-native', 'react-dom'],
+              message: 'packages/ui is shared by web and mobile and must stay framework-blind.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);

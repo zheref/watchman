@@ -1,0 +1,20 @@
+{
+  "name": "@watchman/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared presentation layer for Watchman: the words and small formatters the web and mobile apps both print, in one place so the two never drift.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/test/link-host-cases.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@watchman/core": "*"
+  }
+}

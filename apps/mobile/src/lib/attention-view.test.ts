@@ -9,17 +9,17 @@ import empty from '@watchman/core/fixtures/synthetic/empty.json';
 import full from '@watchman/core/fixtures/synthetic/full.json';
 import manualOnly from '@watchman/core/fixtures/synthetic/manual-only.json';
 import overflow from '@watchman/core/fixtures/synthetic/overflow.json';
+import { KIND_LABEL, linkDestination, linkHost, waitedLabel } from '@watchman/ui';
+import { LINK_HOST_CASES } from '@watchman/ui/testing';
 import { describe, expect, it } from 'vitest';
 import {
-  KIND_LABEL,
   attentionTile,
   attentionTileFromJson,
-  linkHost,
   showManualBadge,
   stampText,
   tileLabel,
-  waitedLabel,
 } from './attention-view';
+import * as attentionView from './attention-view';
 import { loadAttentionTile } from './load-attention';
 
 const snapshotOf = (input: unknown): Snapshot => assertSnapshot(input);
@@ -185,8 +185,8 @@ describe('labelled states', () => {
   });
 });
 
-describe('plain-word helpers', () => {
-  it('labels every attention kind', () => {
+describe('the shared presentation helpers, as the mobile app prints them', () => {
+  it('labels every attention kind in the shared words', () => {
     expect(Object.keys(KIND_LABEL).sort()).toEqual([
       'blocked_card',
       'owner_decision',
@@ -201,10 +201,34 @@ describe('plain-word helpers', () => {
     expect(waitedLabel(100)).toBe('4d');
   });
 
-  it('linkHost reads the host of an https link without URL', () => {
-    expect(linkHost('https://github.com/zheref/x/pull/1?a=b')).toBe('github.com');
-    expect(linkHost('https://Example.COM:8443/p')).toBe('example.com');
-    expect(linkHost('not a link')).toBe('');
+  it.each(LINK_HOST_CASES)('linkHost(%j) is %j, the one answer both apps give', (url, host) => {
+    expect(linkHost(url)).toBe(host);
+  });
+
+  it('puts the shared words and host on every row of the tile', () => {
+    const tile = attentionTile(assertSnapshot(full));
+    if (tile.state !== 'value') throw new Error('expected a tile with items');
+    expect(tile.items.length).toBeGreaterThan(0);
+    for (const item of tile.items) {
+      expect(item.host).toBe(linkHost(item.url));
+      expect(item.host).toBe(linkDestination(item.url));
+      expect(item.host).not.toBe('');
+      expect(Object.values(KIND_LABEL)).toContain(item.kindLabel);
+    }
+  });
+
+  it('prints plain words, never an empty host, for a link whose host cannot be read', () => {
+    const input = structuredClone(full) as { attention: { candidates: { url: string }[] } };
+    for (const candidate of input.attention.candidates) candidate.url = 'https://bücher.example/a';
+    const tile = attentionTile(assertSnapshot(input));
+    if (tile.state !== 'value') throw new Error('expected a tile with items');
+    for (const item of tile.items) expect(item.host).toBe('another site');
+  });
+
+  it('keeps no copy of its own: the one implementation lives in @watchman/ui', () => {
+    for (const name of ['KIND_LABEL', 'waitedLabel', 'linkHost', 'linkDestination']) {
+      expect(Object.keys(attentionView)).not.toContain(name);
+    }
   });
 });
 

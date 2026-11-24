@@ -9,7 +9,6 @@ import {
   monthOf,
   rankAttention,
   staleItems,
-  type AttentionKind,
   type Board,
   type FlowProject,
   type MetricName,
@@ -38,23 +37,6 @@ const stampOf = (r: { source: string; as_of: string; manual?: boolean }): Stamp 
   as_of: r.as_of,
   ...(r.manual === true ? { manual: true } : {}),
 });
-
-/** Plain words for why an item waits on the owner. */
-export const KIND_LABEL: Record<AttentionKind, string> = {
-  owner_decision: 'Needs your decision',
-  blocked_card: 'Blocked',
-  waiting_pr: 'Review waiting over 2 days',
-};
-
-/** `30h` under two days, `3d` from there. */
-export function waitedLabel(hours: number): string {
-  return hours < 48 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
-}
-
-/** The host a deep link opens, for the link's visible text: `github.com`. */
-export function linkHost(url: string): string {
-  return new URL(url).hostname;
-}
 
 export type AttentionDetail =
   | Missing

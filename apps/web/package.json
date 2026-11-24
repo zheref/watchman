@@ -13,6 +13,7 @@
     "@chakra-ui/react": "^3.38.0",
     "@emotion/react": "^11.14.0",
     "@watchman/core": "*",
+    "@watchman/ui": "*",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",

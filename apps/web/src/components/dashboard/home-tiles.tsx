@@ -4,17 +4,10 @@ import {
   type Snapshot,
   type SourceStatusRecord,
 } from '@watchman/core';
+import { KIND_LABEL, linkDestination, waitedLabel } from '@watchman/ui';
 import type { ReactNode } from 'react';
 import { Tile, TileList } from '@/components/metro';
-import {
-  attentionDetail,
-  boardView,
-  busiestProjects,
-  KIND_LABEL,
-  linkHost,
-  metricsDetail,
-  waitedLabel,
-} from '@/lib/details';
+import { attentionDetail, boardView, busiestProjects, metricsDetail } from '@/lib/details';
 import type { TileId } from '@/lib/layout';
 import { attentionView, flowView, plural, spendView, type ViewOptions } from '@/lib/tiles';
 import { TileLines } from './parts';
@@ -98,7 +91,7 @@ export function homeTiles(snapshot: Snapshot, now: Date, options: ViewOptions = 
           items={attention.items.map((item) => ({
             key: item.id,
             href: item.url,
-            hrefHint: `opens ${linkHost(item.url)}`,
+            hrefHint: `opens ${linkDestination(item.url)}`,
             label: item.title,
             meta: `${KIND_LABEL[item.kind]} · ${item.project} · waiting ${waitedLabel(item.waited_hours)}`,
           }))}
