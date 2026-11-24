@@ -222,6 +222,7 @@ describe('the shared presentation helpers, as the mobile app prints them', () =>
     for (const candidate of input.attention.candidates) candidate.url = 'https://bücher.example/a';
     const tile = attentionTile(assertSnapshot(input));
     if (tile.state !== 'value') throw new Error('expected a tile with items');
+    expect(tile.items.length).toBeGreaterThan(0);
     for (const item of tile.items) expect(item.host).toBe('another site');
   });
 

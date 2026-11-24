@@ -45,11 +45,12 @@ const HOST_NAME = /^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]
  *   the last `@`, as a browser reads it;
  * - the answer is lower-case, with no port.
  *
- * It declines rather than guesses. A browser would repair many spellings this function refuses
+ * It declines rather than guesses. A browser would repair several spellings this function refuses
  * (a leading or trailing space, a tab or line break anywhere, a missing or extra slash, a percent
- * escape or a non-ASCII letter in the host, a zero-padded port, an IP address), and `deepLink` in
- * core judges a link after that repair, so a validated snapshot can still carry one. Print
- * `linkDestination`, which never leaves a screen with an empty host.
+ * escape or a non-ASCII letter in the host, a port longer than five digits), and `deepLink` in
+ * core judges a link after that repair, so a validated snapshot can still carry one. An IP address
+ * is refused here and by `deepLink` alike. Print `linkDestination`, which never leaves a screen
+ * with an empty host.
  *
  * For every link `deepLink` accepts, a non-empty answer is exactly `new URL(url).hostname`: the
  * host named is the host the link opens. (Outside those links one difference is known: a label

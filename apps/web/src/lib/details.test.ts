@@ -201,6 +201,7 @@ describe('the shared presentation helpers, as the web app prints them', () => {
   it('names the host of every attention link in the fixture as a browser reads it', () => {
     const detail = attentionDetail(fullSnapshot, now);
     if (detail.state !== 'value') throw new Error('expected attention');
+    expect(detail.items.length).toBeGreaterThan(0);
     for (const item of detail.items) {
       expect(linkHost(item.url)).toBe(new URL(item.url).hostname);
       expect(linkDestination(item.url)).toBe(new URL(item.url).hostname);
