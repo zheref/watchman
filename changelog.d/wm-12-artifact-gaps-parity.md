@@ -1,0 +1,1 @@
+- **Artifact gap parity**: `artifacts/watchman-v0.test.tsx` now checks the artifact's copied `gapsFor` against core's `sourceGaps` on every synthetic fixture given a synthetic `sources` record, on built snapshots and over the single-value mutation sweep, so a change to the gap rule in core that the artifact does not mirror fails `npm test` (zheref/watchman#12).
