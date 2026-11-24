@@ -27,3 +27,10 @@ shows and how it reuses `packages/core`.
 - `src/lib/open-link.ts` opens a deep link through an injected opener and reports the outcome; pure and unit-tested.
 - `src/lib/load-attention.ts` reads the bundled synthetic fixture through core's validation.
 - `src/palette.ts` and `src/theme.ts` are the Metro colours, type scale and spacing.
+- `src/**/*.test.tsx` is the render lane: the screen, the tile and the route files drawn through
+  `react-native-web` under happy-dom and queried by role and accessible name (value, "No data",
+  manual and link-failed states). It runs in `npm test` with no simulator or device. It does not
+  prove native layout, the rows' `accessibilityHint` (`react-native-web` drops it, so removing it
+  would pass), the `maxFontSizeMultiplier` text-size caps, or the live region's behaviour on iOS and
+  Android (`aria-live` is checked on the web form; on iOS only the stubbed `announceForAccessibility`
+  call is).
