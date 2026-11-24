@@ -111,8 +111,11 @@ describe('readDashboardData', () => {
   });
 });
 
-describe('the source rule', () => {
-  it("is core's resolveSnapshotSource, plus only the time of the read", async () => {
+describe("the loader's wiring", () => {
+  // This holds how the loader feeds core's rule (the reader, the fixture, its
+  // label) and that it adds nothing but the time of the read. It cannot see a
+  // local copy of the rule that happens to agree with core today.
+  it("passes its reader and fixture to core's resolveSnapshotSource and adds only the time of the read", async () => {
     const cases: [Record<string, string>, SnapshotDirReader][] = [
       [{}, memory({})],
       [
