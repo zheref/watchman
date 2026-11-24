@@ -20,46 +20,53 @@ export function waitedLabel(hours: number): string {
   return hours < 48 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
 }
 
-const SCHEME = 'https://';
+/** `https://` in either case, spelled out so no engine's case tables are consulted. */
+const SCHEME = /^[Hh][Tt][Tt][Pp][Ss]:\/\//;
 
 /** Where the authority ends. A browser reads `\` as `/` in an https URL, so it ends there too. */
 const AUTHORITY_END = /[/?#\\]/;
 
 /**
  * The host-name rule `deepLink` in `@watchman/core` holds a link to: at most 253 characters,
- * dotted, labels of ASCII letters, digits and inner hyphens, an alphabetic top level.
+ * dotted, labels of ASCII letters, digits and inner hyphens, an alphabetic top level. Both cases
+ * are spelled out and it is tested BEFORE lower-casing, so a look-alike such as the Kelvin sign
+ * (which lower-cases to `k`) is never taken for an ASCII letter.
  */
-const HOST_NAME = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+const HOST_NAME = /^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/;
 
 /**
  * The host a deep link opens, for the link's visible text: `github.com`.
  *
- * One behaviour for both apps:
- * - it never throws: anything that is not an `https` link to a host name core would accept gives
- *   `''` (a non-string, another scheme, an IP address, a non-ASCII or percent-encoded host, a
- *   port that is not a number up to 65535);
+ * One behaviour for both apps. It answers only for a link spelled exactly
+ * `https://` + an optional user part + an ASCII host name + an optional `:` and up to five digits,
+ * at most 65535, followed by the end, `/`, `?`, `#` or `\`. For anything else it answers `''`:
+ * - it never throws, whatever it is handed (a non-string included);
  * - it never shows a user part: for `https://user:secret@example.com/` the host is what follows
  *   the last `@`, as a browser reads it;
  * - the answer is lower-case, with no port.
  *
- * Whenever it answers, the answer is exactly `new URL(url).hostname`. `deepLink` in core judges a
- * link after URL parsing, so it lets a few odd spellings through whose host this function will not
- * read: a leading space, a line break or a percent escape inside the host, a non-ASCII host. For
- * those the answer is `''`, never a guess; print `linkDestination` so no screen shows an empty host.
+ * It declines rather than guesses. A browser would repair many spellings this function refuses
+ * (a leading or trailing space, a tab or line break anywhere, a missing or extra slash, a percent
+ * escape or a non-ASCII letter in the host, a zero-padded port, an IP address), and `deepLink` in
+ * core judges a link after that repair, so a validated snapshot can still carry one. Print
+ * `linkDestination`, which never leaves a screen with an empty host.
+ *
+ * For every link `deepLink` accepts, a non-empty answer is exactly `new URL(url).hostname`: the
+ * host named is the host the link opens. (Outside those links one difference is known: a label
+ * that only looks like punycode, `xn--a.com`, is answered here and refused by a browser.)
  */
 export function linkHost(url: string): string {
-  if (typeof url !== 'string') return '';
-  if (url.slice(0, SCHEME.length).toLowerCase() !== SCHEME) return '';
-  const rest = url.slice(SCHEME.length);
+  if (typeof url !== 'string' || !SCHEME.test(url)) return '';
+  const rest = url.slice('https://'.length);
   const end = rest.search(AUTHORITY_END);
   const authority = end === -1 ? rest : rest.slice(0, end);
   const hostAndPort = authority.slice(authority.lastIndexOf('@') + 1);
   const colon = hostAndPort.indexOf(':');
-  const host = (colon === -1 ? hostAndPort : hostAndPort.slice(0, colon)).toLowerCase();
+  const host = colon === -1 ? hostAndPort : hostAndPort.slice(0, colon);
   const port = colon === -1 ? '' : hostAndPort.slice(colon + 1);
   if (!/^\d{0,5}$/.test(port) || Number(port) > 65535) return '';
   if (host.length > 253 || !HOST_NAME.test(host)) return '';
-  return host;
+  return host.toLowerCase();
 }
 
 /**

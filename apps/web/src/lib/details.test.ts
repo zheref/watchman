@@ -212,7 +212,7 @@ describe('the shared presentation helpers, as the web app prints them', () => {
     expect(linkDestination(' https://example.com/')).toBe('another site');
   });
 
-  it('keeps no copy of its own: the one implementation lives in @watchman/ui', () => {
+  it('exports none of the shared helpers itself (the lint rule refuses a copy anywhere in the app)', () => {
     for (const name of ['KIND_LABEL', 'waitedLabel', 'linkHost', 'linkDestination']) {
       expect(Object.keys(details)).not.toContain(name);
     }

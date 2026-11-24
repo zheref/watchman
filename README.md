@@ -95,8 +95,9 @@ allowlist; and the versioned snapshot document is both the wire format and the d
 consumers read (UZF-17 separates the two), because the document is itself the product's contract.
 
 The stack handbook this repository resolves is `react-uzf-v1`. Its monorepo topology (RC-49 to
-RC-51) differs from this layout (an MCP package, npm workspaces, no Redux or shared-UI tier); the
-ruling on that difference is tracked in #8.
+RC-51) differs from this layout (an MCP package, npm workspaces, no Redux tier); the ruling on that
+difference is tracked in #8. The owner ruled on that question on 2026-11-24 that wording both
+apps print belongs in a shared UI layer, not in `packages/core`: that layer is `packages/ui`.
 
 ## Building a real snapshot
 

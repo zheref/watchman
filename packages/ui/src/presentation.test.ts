@@ -18,6 +18,16 @@ function deepLinksIn(value: unknown): string[] {
   );
 }
 
+/** Whether the platform's own parser takes the link at all. */
+function canParse(url: string): boolean {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** The platform's own URL parser, declared here because this package compiles with no platform types. */
 declare const URL: new (url: string) => { readonly hostname: string };
 
@@ -53,7 +63,7 @@ describe('linkHost', () => {
     }
   });
 
-  it('never shows a user part, a port, a path or an upper-case letter', () => {
+  it('never shows a user part, a port, a path, an upper-case or a non-ASCII letter', () => {
     for (const [url] of LINK_HOST_CASES) {
       expect(linkHost(url)).toMatch(/^[a-z0-9.-]*$/);
     }
@@ -69,27 +79,32 @@ describe('linkHost', () => {
     }
   });
 
-  it('for a link core accepts, is the browser hostname or, for an odd spelling, nothing', () => {
-    // `deepLink` judges a link after URL parsing, so these raw spellings pass it. A browser would
-    // normalise them; this function declines to, and the apps print `linkDestination` instead.
-    const declined = [
+  it('for every link core accepts, names the host a browser opens, or declines', () => {
+    const accepted = LINK_HOST_CASES.filter(([url]) => deepLink.safeParse(url).success);
+    const answered = accepted.filter(([, host]) => host !== '');
+    expect(answered.length).toBeGreaterThan(10);
+    for (const [url, host] of answered) expect(new URL(url).hostname).toBe(host);
+    // Core judges a link after a browser's repairs, so it accepts spellings this function declines.
+    const declined = accepted.filter(([, host]) => host === '').map(([url]) => url);
+    for (const url of [
       ' https://example.com/',
+      'https:example.com',
       'https://exa\nmple.com/',
       'https://ex%61mple.com/',
       'https://bücher.example/',
-    ];
-    const accepted = LINK_HOST_CASES.filter(([url]) => deepLink.safeParse(url).success);
-    expect(accepted.length).toBeGreaterThan(declined.length + 5);
-    for (const [url, host] of accepted) {
-      if (declined.includes(url)) expect(host).toBe('');
-      else expect(host).toBe(new URL(url).hostname);
+      'https://example.com:000000080/',
+      'https://\u212Aitten.com/',
+    ]) {
+      expect(declined).toContain(url);
     }
-    for (const url of declined) expect(accepted.map(([accept]) => accept)).toContain(url);
   });
 
-  it('agrees with a browser on the host of every link it answers for', () => {
+  it('names a host a browser would refuse only for a label that looks like punycode', () => {
+    const refused = LINK_HOST_CASES.filter(([url, host]) => host !== '' && !canParse(url));
+    expect(refused.map(([url]) => url)).toEqual(['https://xn--a.com/']);
+    for (const [url] of refused) expect(deepLink.safeParse(url).success).toBe(false);
     for (const [url, host] of LINK_HOST_CASES) {
-      if (host !== '') expect(new URL(url).hostname).toBe(host);
+      if (host !== '' && canParse(url)) expect(new URL(url).hostname).toBe(host);
     }
   });
 

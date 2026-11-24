@@ -51,6 +51,39 @@ export default defineConfig([
     },
   },
   {
+    // WM-IS-#16: the words both apps print live once, in packages/ui. An app declares no copy of
+    // them, under these names, anywhere in its source.
+    files: ['apps/*/src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            ':matches(VariableDeclarator, FunctionDeclaration)[id.name=/^(KIND_LABEL|waitedLabel|linkHost|linkDestination)$/]',
+          message: 'Import this from @watchman/ui: the apps keep no copy of the shared words.',
+        },
+      ],
+    },
+  },
+  {
+    // The pinned link table is test data: only a test may import it.
+    files: ['apps/*/src/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@watchman/ui/testing',
+              message: 'Test data: import @watchman/ui/testing from a test file only.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // packages/ui is the shared presentation layer: words and small formatters printed by both
     // apps, on Node, in the browser and on Hermes. It stays as framework-blind as core.
     files: ['packages/ui/src/**/*.ts'],

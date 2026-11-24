@@ -225,7 +225,7 @@ describe('the shared presentation helpers, as the mobile app prints them', () =>
     for (const item of tile.items) expect(item.host).toBe('another site');
   });
 
-  it('keeps no copy of its own: the one implementation lives in @watchman/ui', () => {
+  it('exports none of the shared helpers itself (the lint rule refuses a copy anywhere in the app)', () => {
     for (const name of ['KIND_LABEL', 'waitedLabel', 'linkHost', 'linkDestination']) {
       expect(Object.keys(attentionView)).not.toContain(name);
     }

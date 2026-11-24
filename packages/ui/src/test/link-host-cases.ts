@@ -16,6 +16,8 @@ export const LINK_HOST_CASES: readonly (readonly [url: string, host: string])[] 
   ['HTTPS://EXAMPLE.COM/', 'example.com'],
   ['https://example.com:443', 'example.com'],
   ['https://example.com:/', 'example.com'],
+  ['https://example.com:00080/', 'example.com'],
+  ['https://example.com:65535/', 'example.com'],
   // Never the user part: the host is what follows the last `@`.
   ['https://user@example.com/', 'example.com'],
   ['https://user:secret@example.com:8443/p', 'example.com'],
@@ -49,4 +51,25 @@ export const LINK_HOST_CASES: readonly (readonly [url: string, host: string])[] 
   ['https://example.c/', ''],
   [`https://${'a'.repeat(64)}.example/`, ''],
   [`https://${'a.'.repeat(130)}example/`, ''],
+  ['https://example.com:65536/', ''],
+  // Spellings a browser would repair, and core's `deepLink` therefore accepts. Declined, not guessed.
+  ['https:///example.com/', ''],
+  ['https:example.com', ''],
+  ['https:/example.com', ''],
+  ['https:\\\\example.com', ''],
+  ['https://example.com\t', ''],
+  ['https://exa\tmple.com', ''],
+  ['https://exa\rmple.com', ''],
+  ['https://example.com ', ''],
+  ['\u0001https://example.com', ''],
+  ['https://example.com:000000080/', ''],
+  // Look-alikes: letters that lower-case or normalise to ASCII are still not ASCII.
+  ['https://\u212Aitten.com/', ''],
+  ['https://\u017Fub.example/', ''],
+  ['https://example\uFF0Ecom/', ''],
+  ['https://example\u3002com/', ''],
+  ['https://exa\u200Bmple.com/', ''],
+  // The one known difference from a browser: a label that only looks like punycode. A browser
+  // refuses the link; core's `deepLink` refuses it too, so no validated snapshot carries one.
+  ['https://xn--a.com/', 'xn--a.com'],
 ];
