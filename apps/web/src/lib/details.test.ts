@@ -3,17 +3,18 @@ import empty from '@watchman/core/fixtures/synthetic/empty.json';
 import full from '@watchman/core/fixtures/synthetic/full.json';
 import pastReset from '@watchman/core/fixtures/synthetic/past-reset.json';
 import sparse from '@watchman/core/fixtures/synthetic/sparse.json';
+import { KIND_LABEL, linkDestination, linkHost, waitedLabel } from '@watchman/ui';
+import { LINK_HOST_CASES } from '@watchman/ui/testing';
 import { describe, expect, it } from 'vitest';
 import {
   attentionDetail,
   boardView,
   busiestProjects,
   flowDetail,
-  linkHost,
   metricsDetail,
   spendDetail,
-  waitedLabel,
 } from './details';
+import * as details from './details';
 
 const fullSnapshot = assertSnapshot(full);
 const now = new Date(fullSnapshot.generated_at);
@@ -186,10 +187,35 @@ describe('metricsDetail', () => {
   });
 });
 
-describe('labels', () => {
-  it('formats a wait and a link host', () => {
+describe('the shared presentation helpers, as the web app prints them', () => {
+  it('formats a wait and names every kind in the shared words', () => {
     expect(waitedLabel(30)).toBe('30h');
     expect(waitedLabel(80)).toBe('3d');
-    expect(linkHost('https://example.com/a/b')).toBe('example.com');
+    expect(KIND_LABEL.waiting_pr).toBe('Review waiting over 2 days');
+  });
+
+  it.each(LINK_HOST_CASES)('linkHost(%j) is %j, the one answer both apps give', (url, host) => {
+    expect(linkHost(url)).toBe(host);
+  });
+
+  it('names the host of every attention link in the fixture as a browser reads it', () => {
+    const detail = attentionDetail(fullSnapshot, now);
+    if (detail.state !== 'value') throw new Error('expected attention');
+    expect(detail.items.length).toBeGreaterThan(0);
+    for (const item of detail.items) {
+      expect(linkHost(item.url)).toBe(new URL(item.url).hostname);
+      expect(linkDestination(item.url)).toBe(new URL(item.url).hostname);
+    }
+  });
+
+  it('prints plain words, never an empty host, for a link whose host cannot be read', () => {
+    expect(linkDestination('https://bücher.example/a')).toBe('another site');
+    expect(linkDestination(' https://example.com/')).toBe('another site');
+  });
+
+  it('exports none of the shared helpers itself (the lint rule refuses a copy anywhere in the app)', () => {
+    for (const name of ['KIND_LABEL', 'waitedLabel', 'linkHost', 'linkDestination']) {
+      expect(Object.keys(details)).not.toContain(name);
+    }
   });
 });

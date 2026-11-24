@@ -44,6 +44,7 @@ This is one npm-workspaces monorepo (npm only: no pnpm, yarn or bun, and one roo
 | `apps/mobile`   | `@watchman/mobile` | Expo (TypeScript, Expo Router): the Attention tile on a phone, from the synthetic fixture.                                                        |
 | `packages/core` | `@watchman/core`   | The versioned `Snapshot` model and its validation, the Attention ranking and Flow/Spend/Metrics helpers, source adapters and synthetic fixtures.  |
 | `packages/mcp`  | `@watchman/mcp`    | The read-only MCP server: four tools (attention, flow, spend, metrics) over the snapshot, stdio only. Its contract is `packages/mcp/CONTRACT.md`. |
+| `packages/ui`   | `@watchman/ui`     | The shared presentation layer: the words and small formatters both apps print (`KIND_LABEL`, `waitedLabel`, `linkHost`, `linkDestination`).       |
 | `artifacts`     | (not a package)    | `watchman-v0.tsx`, the single-file Claude artifact (v0), and the test that keeps it in step with `packages/core`.                                 |
 
 `packages/core/scripts/` holds the one Node entry point, the `npm run snapshot` command. It sits
@@ -101,8 +102,9 @@ Vitest through `react-native-web` instead, so the mobile views land in the one c
 prove is listed under the mobile app below.
 
 The stack handbook this repository resolves is `react-uzf-v1`. Its monorepo topology (RC-49 to
-RC-51) differs from this layout (an MCP package, npm workspaces, no Redux or shared-UI tier); the
-ruling on that difference is tracked in #8.
+RC-51) differs from this layout (an MCP package, npm workspaces, no Redux tier); the ruling on that
+difference is tracked in #8. The owner ruled on that question on 2026-11-24 that wording both
+apps print belongs in a shared UI layer, not in `packages/core`: that layer is `packages/ui`.
 
 ## Building a real snapshot
 
@@ -380,7 +382,8 @@ hardware keyboard.
 Ranking, validation and provenance are not reimplemented: the app imports `parseSnapshot`,
 `rankAttention` and `combineProvenance` from `@watchman/core` through the npm workspace, and
 `src/lib/attention-view.ts` only turns their output into the words the screen prints (the
-view-model, unit-tested). Expo's Metro config resolves workspace packages on its own, so there is no
+view-model, unit-tested). The words shared with the web dashboard (why an item waits, how long, which
+host a link opens) come from `@watchman/ui`, one implementation for both apps. Expo's Metro config resolves workspace packages on its own, so there is no
 `metro.config.js`. The fixture is bundled, so the app makes no network request and holds no token;
 real snapshots stay server-side, as in the safeguards below.
 

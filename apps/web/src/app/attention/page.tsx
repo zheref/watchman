@@ -12,7 +12,8 @@ import {
   TextLink,
 } from '@/components/dashboard/parts';
 import { Provenance } from '@/components/metro';
-import { KIND_LABEL, attentionDetail, linkHost, waitedLabel } from '@/lib/details';
+import { KIND_LABEL, linkDestination, waitedLabel } from '@watchman/ui';
+import { attentionDetail } from '@/lib/details';
 import { getDashboardData } from '@/server/dashboard';
 
 export const metadata: Metadata = {
@@ -59,7 +60,7 @@ export default async function AttentionPage() {
                   <span key="item" data-attention-item={item.id}>
                     <TextLink href={item.url}>
                       {item.title}
-                      <SrOnly>{` (opens ${linkHost(item.url)})`}</SrOnly>
+                      <SrOnly>{` (opens ${linkDestination(item.url)})`}</SrOnly>
                     </TextLink>
                     <br />
                     {item.project}

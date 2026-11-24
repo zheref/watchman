@@ -253,3 +253,38 @@ describe('/theme preview', () => {
     expect(html).toMatch(/<a[^>]*href="\/"/);
   });
 });
+
+describe('a deep link whose host cannot be read', () => {
+  /** The full fixture with every deep link respelled so that no host can be read from it. */
+  const unreadable = (): Snapshot => {
+    const respell = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(respell);
+      if (value === null || typeof value !== 'object') return value;
+      return Object.fromEntries(
+        Object.entries(value).map(([key, inner]) => [
+          key,
+          key === 'url' ? 'https://bücher.example/a' : respell(inner),
+        ]),
+      );
+    };
+    return assertSnapshot(respell(full));
+  };
+
+  it.each([
+    ['the home tiles', Home],
+    ['the Attention page', AttentionPage],
+    ['the Flow page', FlowPage],
+  ])('reads "opens another site" on %s, never "opens" with nothing after it', async (_, page) => {
+    state.data = fileData(unreadable());
+    const html = await render(page);
+    expect(html).toContain('(opens another site)');
+    expect(html).not.toContain('(opens )');
+    expect(html).not.toContain('(opens example.com)');
+  });
+
+  it('still names the host on all three when it can be read', async () => {
+    for (const page of [Home, AttentionPage, FlowPage]) {
+      expect(await render(page)).toContain('(opens example.com)');
+    }
+  });
+});

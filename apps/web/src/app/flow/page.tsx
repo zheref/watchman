@@ -12,7 +12,8 @@ import {
   TextLink,
 } from '@/components/dashboard/parts';
 import { Provenance, Tile, TileGrid } from '@/components/metro';
-import { flowDetail, linkHost } from '@/lib/details';
+import { linkDestination } from '@watchman/ui';
+import { flowDetail } from '@/lib/details';
 import { plural } from '@/lib/tiles';
 import { getDashboardData } from '@/server/dashboard';
 
@@ -110,7 +111,7 @@ export default async function FlowPage() {
                     <span key="item">
                       <TextLink href={w.url}>
                         {w.title}
-                        <SrOnly>{` (opens ${linkHost(w.url)})`}</SrOnly>
+                        <SrOnly>{` (opens ${linkDestination(w.url)})`}</SrOnly>
                       </TextLink>
                       <br />
                       {w.project}
