@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import full from '@watchman/core/fixtures/synthetic/full.json';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { SnapshotDirReader } from '@watchman/core';
-import { FIXTURE_SOURCE, readDashboardData, unavailableSnapshot } from './snapshot';
+import { SECTION_KEYS, resolveSnapshotSource, type SnapshotDirReader } from '@watchman/core';
+import { FIXTURE_SOURCE, readDashboardData } from './snapshot';
 
 const NOW = new Date('2026-11-22T20:00:00Z');
 let dir: string;
@@ -78,10 +78,18 @@ describe('readDashboardData', () => {
     ];
     for (const [files, problem] of cases) {
       const data = await readDashboardData({ WATCHMAN_SNAPSHOT_DIR: '/secret/dir' }, NOW, files);
-      expect(data.origin).toBe('unavailable');
+      expect(data).toMatchObject({ origin: 'unavailable', source: 'snapshot directory' });
       expect(data.problem).toMatch(problem);
       expect(JSON.stringify(data)).not.toMatch(/\/secret\/dir|"x"/);
-      expect(data.snapshot.attention).toMatchObject({ state: 'no_data', reason: data.problem });
+      expect(data.snapshot.generated_at).toBe(NOW.toISOString());
+      for (const key of SECTION_KEYS) {
+        expect(data.snapshot[key]).toEqual({
+          state: 'no_data',
+          reason: data.problem,
+          source: 'watchman',
+          as_of: NOW.toISOString(),
+        });
+      }
       expect(data.snapshot.synthetic).toBeUndefined();
     }
   });
@@ -103,11 +111,29 @@ describe('readDashboardData', () => {
   });
 });
 
-describe('unavailableSnapshot', () => {
-  it('is a valid snapshot with every section no data', () => {
-    const snapshot = unavailableSnapshot('why', NOW);
-    for (const key of ['attention', 'flow', 'spend', 'metrics'] as const) {
-      expect(snapshot[key]).toMatchObject({ state: 'no_data', reason: 'why', source: 'watchman' });
+describe('the source rule', () => {
+  it("is core's resolveSnapshotSource, plus only the time of the read", async () => {
+    const cases: [Record<string, string>, SnapshotDirReader][] = [
+      [{}, memory({})],
+      [
+        { WATCHMAN_SNAPSHOT_DIR: '/x' },
+        memory({ 'snapshot-2026-01-14T15-00-00Z.json': JSON.stringify(full) }),
+      ],
+      [
+        { WATCHMAN_SNAPSHOT_DIR: '/x' },
+        memory({}, Object.assign(new Error('EACCES'), { code: 'EACCES' })),
+      ],
+    ];
+    for (const [env, reader] of cases) {
+      const core = await resolveSnapshotSource(env, NOW, {
+        reader,
+        fixture: full,
+        fixtureSource: FIXTURE_SOURCE,
+      });
+      expect(await readDashboardData(env, NOW, reader)).toEqual({
+        ...core,
+        read_at: NOW.toISOString(),
+      });
     }
   });
 });
