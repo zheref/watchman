@@ -809,8 +809,12 @@ describe('the drift guard', () => {
         })),
       ),
     );
-    // One adapter listed twice, so a rule that dropped repeats would show.
-    return [...matrix, { adapter: 'synthetic-00', status: 'failed', feeds: [...SECTION_KEYS] }];
+    // One adapter that is itself a gap, listed twice, so a rule that dropped repeats would show.
+    const gap = matrix.find(
+      (s) => s.status === 'failed' && !('reason' in s) && s.feeds.length === SECTION_KEYS.length,
+    );
+    if (!gap) throw new Error('the matrix should hold a failed source that feeds every section');
+    return [...matrix, { ...gap }];
   }
   const gapLists = (json: unknown) => {
     const c = parseSnapshot(json);
