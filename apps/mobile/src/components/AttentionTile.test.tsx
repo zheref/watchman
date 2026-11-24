@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { attentionTile, attentionTileFromJson, tileLabel } from '../lib/attention-view';
 import { loadAttentionTile } from '../lib/load-attention';
 import { LINK_FAILED_MESSAGE } from '../lib/open-link';
+import { COLORS } from '../theme';
 import { AttentionTile } from './AttentionTile';
 
 // The render lane: `react-native` is `react-native-web` here (apps/mobile/vitest.config.mts), so
@@ -19,6 +20,19 @@ afterEach(() => {
 });
 
 const tile = () => screen.getByRole('region');
+
+/** `#RRGGBB` as `[r, g, b]`. */
+const hexRgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+/** The computed colour of each border side, as `[r, g, b, a]` numbers. */
+const borderRgba = (el: HTMLElement) => {
+  const style = getComputedStyle(el);
+  return (['Top', 'Right', 'Bottom', 'Left'] as const).map((side) =>
+    (style.getPropertyValue(`border-${side.toLowerCase()}-color`).match(/[\d.]+/g) ?? []).map(
+      Number,
+    ),
+  );
+};
 
 describe('the value state, from the bundled synthetic fixture', () => {
   const view = loadAttentionTile();
@@ -61,15 +75,17 @@ describe('the value state, from the bundled synthetic fixture', () => {
     ).toBeDefined();
   });
 
-  it('draws a focus outline on the focused row only, and removes it on blur', () => {
+  it('draws a focus outline in the focus colour on the focused row only, and clears it on blur', () => {
     render(<AttentionTile view={view} />);
     const [first, second] = screen.getAllByRole('link');
-    const resting = first!.className;
+    const focusRgba = [...hexRgb(COLORS.focus), 1];
+    const transparent = [0, 0, 0, 0];
+    expect(borderRgba(first!)).toEqual([transparent, transparent, transparent, transparent]);
     fireEvent.focus(first!);
-    expect(first!.className).not.toBe(resting);
-    expect(second!.className).toBe(resting);
+    expect(borderRgba(first!)).toEqual([focusRgba, focusRgba, focusRgba, focusRgba]);
+    expect(borderRgba(second!)).toEqual([transparent, transparent, transparent, transparent]);
     fireEvent.blur(first!);
-    expect(first!.className).toBe(resting);
+    expect(borderRgba(first!)).toEqual([transparent, transparent, transparent, transparent]);
   });
 });
 

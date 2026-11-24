@@ -361,8 +361,12 @@ nothing depends on them. Body text follows the system text size (the big figures
 1.2x), and the content keeps a 640dp column on tablets. White on cobalt is 6.2:1; a test keeps every
 text colour at WCAG AA. Render tests draw the screen and the tile through `react-native-web` in
 `npm test` and check the value, "No data", manual and link-failed states by role and accessible name
-(the link-failed message is an assertive live region and is announced); they prove the components'
-logic and labels, not native layout. It was run in the iOS simulator through Expo Go (screenshot in
+(the link-failed message carries `aria-live="assertive"` and the announcement is called). They run
+the components on `react-native-web`, so they do not prove native layout; the row's
+`accessibilityHint`, which `react-native-web` drops (removing the hint would still pass); the text-size
+caps (`maxFontSizeMultiplier`); or how the live region behaves on a phone (`aria-live` is the web form
+of an Android-only live region, and on iOS the only proof is that `announceForAccessibility` is
+called, against a stub). It was run in the iOS simulator through Expo Go (screenshot in
 [`docs/evidence/p3-mobile`](docs/evidence/p3-mobile/README.md)); not yet checked: Android,
 VoiceOver and TalkBack traversal, the largest text sizes at 320dp, and the focus outline on an Android
 hardware keyboard.
