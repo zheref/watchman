@@ -1,11 +1,15 @@
 // One ESLint config for the whole monorepo.
 // - Every TypeScript file gets the typescript-eslint rules Next ships (eslint-config-next/typescript).
 // - apps/web additionally gets Next's core-web-vitals set (React, hooks, a11y, @next/next).
+// - apps/mobile gets the same React hooks rules Next applies to apps/web (rules-of-hooks,
+//   exhaustive-deps and the React Compiler checks), from eslint-plugin-react-hooks' recommended set.
 import { defineConfig, globalIgnores } from 'eslint/config';
 import nextVitals from 'eslint-config-next/core-web-vitals';
 import nextTs from 'eslint-config-next/typescript';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 const WEB_FILES = ['apps/web/**/*.{js,jsx,mjs,ts,tsx,mts}'];
+const MOBILE_FILES = ['apps/mobile/**/*.{js,jsx,mjs,ts,tsx,mts}'];
 
 const APP_SOURCE = 'apps/*/src/**/*.{ts,tsx,mts,js,mjs}';
 const SHARED_WORDS = '/^(KIND_LABEL|waitedLabel|linkHost|linkDestination)$/';
@@ -47,6 +51,10 @@ export default defineConfig([
     files: WEB_FILES,
     extends: [nextVitals],
     settings: { next: { rootDir: 'apps/web/' } },
+  },
+  {
+    files: MOBILE_FILES,
+    ...reactHooks.configs.flat.recommended,
   },
   ...nextTs,
   {

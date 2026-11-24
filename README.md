@@ -54,7 +54,8 @@ tsconfig; whether it should become its own package is part of the topology quest
 from the root `node_modules`, where `apps/web` installs them.
 
 Shared tooling lives at the root: `tsconfig.base.json` (every workspace extends it), one
-`eslint.config.mjs` (typescript-eslint everywhere, plus Next's rules for `apps/web`), one Prettier
+`eslint.config.mjs` (typescript-eslint everywhere, plus Next's rules for `apps/web` and the same
+React hooks rules for `apps/mobile`), one Prettier
 config, and a Vitest config that runs every `packages/*` project, `apps/web`, `apps/mobile` and `artifacts`.
 
 ### The snapshot model
@@ -93,6 +94,12 @@ Two choices here differ from the `react-uzf-v1` handbook and are part of the rul
 `packages/core` depends on `zod` (framework-free) for runtime validation, beyond RC-50's
 allowlist; and the versioned snapshot document is both the wire format and the domain type that
 consumers read (UZF-17 separates the two), because the document is itself the product's contract.
+
+A third difference awaits its own ruling: RC-53 names Jest with the `jest-expo` preset and
+`@testing-library/react-native` for the mobile app's tests. The mobile render tests here run in
+Vitest through `react-native-web` instead, so the mobile views land in the one coverage report and
+`npm test` stays one runner (zheref/watchman#16 allows "an equivalent"). What that lane cannot
+prove is listed under the mobile app below.
 
 The stack handbook this repository resolves is `react-uzf-v1`. Its monorepo topology (RC-49 to
 RC-51) differs from this layout (an MCP package, npm workspaces, no Redux tier); the ruling on that
@@ -360,7 +367,14 @@ hint naming the host it opens, a 48dp touch target and a visible focus outline f
 tile and its list carry `region` and `list` roles, which Android may use and iOS ignores, so
 nothing depends on them. Body text follows the system text size (the big figures are capped at
 1.2x), and the content keeps a 640dp column on tablets. White on cobalt is 6.2:1; a test keeps every
-text colour at WCAG AA. It was run in the iOS simulator through Expo Go (screenshot in
+text colour at WCAG AA. Render tests draw the screen and the tile through `react-native-web` in
+`npm test` and check the value, "No data", manual and link-failed states by role and accessible name
+(the link-failed message carries `aria-live="assertive"` and the announcement is called). They run
+the components on `react-native-web`, so they do not prove native layout; the row's
+`accessibilityHint`, which `react-native-web` drops (removing the hint would still pass); the text-size
+caps (`maxFontSizeMultiplier`); or how the live region behaves on a phone (`aria-live` is the web form
+of an Android-only live region, and on iOS the only proof is that `announceForAccessibility` is
+called, against a stub). It was run in the iOS simulator through Expo Go (screenshot in
 [`docs/evidence/p3-mobile`](docs/evidence/p3-mobile/README.md)); not yet checked: Android,
 VoiceOver and TalkBack traversal, the largest text sizes at 320dp, and the focus outline on an Android
 hardware keyboard.
