@@ -89,7 +89,7 @@ EXPO_UNSTABLE_TREE_SHAKING=1`, iOS JS export), the server-only modules drop to 0
 ## Decision
 
 **Yes: `@watchman/core` should offer a narrower export for render targets** (a subpath such as
-`@watchman/core/view` carrying the snapshot model, validation, provenance, time and the per-tile
+`@watchman/core/view`, a name used here only as an example, carrying the snapshot model, validation, provenance, time and the per-tile
 logic, without `adapters/` and `snapshot-builder`), and `apps/mobile` should import from it. It is
 not built here: nothing requires it today.
 

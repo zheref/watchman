@@ -94,6 +94,12 @@ Two choices here differ from the `react-uzf-v1` handbook and are part of the rul
 allowlist; and the versioned snapshot document is both the wire format and the domain type that
 consumers read (UZF-17 separates the two), because the document is itself the product's contract.
 
+A third difference awaits its own ruling: RC-53 names Jest with the `jest-expo` preset and
+`@testing-library/react-native` for the mobile app's tests. The mobile render tests here run in
+Vitest through `react-native-web` instead, so the mobile views land in the one coverage report and
+`npm test` stays one runner (zheref/watchman#16 allows "an equivalent"). What that lane cannot
+prove is listed under the mobile app below.
+
 The stack handbook this repository resolves is `react-uzf-v1`. Its monorepo topology (RC-49 to
 RC-51) differs from this layout (an MCP package, npm workspaces, no Redux or shared-UI tier); the
 ruling on that difference is tracked in #8.
