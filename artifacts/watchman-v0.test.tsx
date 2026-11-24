@@ -654,6 +654,8 @@ describe('the drift guard', () => {
       expect(tile(page, id)).not.toContain('data-gaps');
     }
     expect(tile(page, 'metrics')).toContain('no scorecard source exists yet');
+    // Whole records on purpose (the parity tests below compare adapters, as WM#12 asks): with
+    // every source present both sides list no gap here, so this also holds the empty case.
     for (const section of Artifact.SECTION_KEYS) {
       expect(Artifact.gapsFor(m, section), section).toEqual(Core.sourceGaps(c, section));
     }
@@ -797,7 +799,7 @@ describe('the drift guard', () => {
       sections[k].state === 'no_data' && sections[k].reason ? [sections[k].reason] : [],
     );
     let n = 0;
-    return SOURCE_STATUSES.flatMap((status) =>
+    const matrix = SOURCE_STATUSES.flatMap((status) =>
       FEED_SHAPES.flatMap((feeds) =>
         [undefined, 'synthetic outage', ...new Set(reasons)].map((reason) => ({
           adapter: `synthetic-${String(n++).padStart(2, '0')}`,
@@ -807,6 +809,8 @@ describe('the drift guard', () => {
         })),
       ),
     );
+    // One adapter listed twice, so a rule that dropped repeats would show.
+    return [...matrix, { adapter: 'synthetic-00', status: 'failed', feeds: [...SECTION_KEYS] }];
   }
   const gapLists = (json: unknown) => {
     const c = parseSnapshot(json);
@@ -839,6 +843,8 @@ describe('the drift guard', () => {
     const lists = gapLists(json);
     if (!lists) throw new Error('the built snapshot should validate');
     for (const { section, core: c, artifact: a } of lists) expect(a, section).toEqual(c);
+    // Not vacuous: with every source absent, some section lists a gap.
+    expect(Math.max(...lists.map((l) => l.core.length))).toBeGreaterThan(0);
   });
 
   it('agrees with core on gaps over every single-value mutation of full.json with sources', () => {
