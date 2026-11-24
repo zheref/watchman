@@ -33,7 +33,9 @@ import WatchmanV0, {
   staleCount,
   throughput,
   validateSnapshot,
+  type SectionKey,
   type Snapshot,
+  type SourceRecord,
 } from './watchman-v0';
 
 /**
@@ -652,6 +654,9 @@ describe('the drift guard', () => {
       expect(tile(page, id)).not.toContain('data-gaps');
     }
     expect(tile(page, 'metrics')).toContain('no scorecard source exists yet');
+    for (const section of Artifact.SECTION_KEYS) {
+      expect(Artifact.gapsFor(m, section), section).toEqual(Core.sourceGaps(c, section));
+    }
     // A merged section names each source once.
     expect(tile(page, 'flow')).toContain(
       'tile · <span>github + manual:ai-services.json + manual:cloud-runs.json + manual:handoff-board.json</span>',
@@ -779,6 +784,88 @@ describe('the drift guard', () => {
     expect(tile(page, 'spend')).toContain('missing: ai-surfaces-spend had no data');
     expect(tile(page, 'metrics')).not.toContain('data-gaps');
     expect(tile(page, 'flow')).not.toContain('handoff-board');
+  });
+
+  // No committed fixture carries a `sources` record, so each one gets a synthetic matrix: every
+  // status × four feed shapes × no reason, an outage reason and each of the fixture's own no-data
+  // reasons (the case the rule leaves out). Distinct adapters keep the order observable.
+  const { SECTION_KEYS, SOURCE_STATUSES } = Artifact;
+  const FEED_SHAPES: SectionKey[][] = [[], ['attention'], ['flow', 'spend'], [...SECTION_KEYS]];
+  function sourcesFor(json: unknown): SourceRecord[] {
+    const sections = json as Record<SectionKey, { state: string; reason?: string }>;
+    const reasons = SECTION_KEYS.flatMap((k) =>
+      sections[k].state === 'no_data' && sections[k].reason ? [sections[k].reason] : [],
+    );
+    let n = 0;
+    return SOURCE_STATUSES.flatMap((status) =>
+      FEED_SHAPES.flatMap((feeds) =>
+        [undefined, 'synthetic outage', ...new Set(reasons)].map((reason) => ({
+          adapter: `synthetic-${String(n++).padStart(2, '0')}`,
+          status,
+          feeds,
+          ...(reason === undefined ? {} : { reason }),
+        })),
+      ),
+    );
+  }
+  const gapLists = (json: unknown) => {
+    const c = parseSnapshot(json);
+    const m = validateSnapshot(json);
+    if (!c.ok || !m.ok) return undefined;
+    return SECTION_KEYS.map((section) => ({
+      section,
+      core: Core.sourceGaps(c.snapshot, section).map((g) => g.adapter),
+      artifact: Artifact.gapsFor(m.snapshot, section).map((g) => g.adapter),
+    }));
+  };
+
+  it.each(Object.keys(FIXTURES))('%s with a sources record: gaps match core’s', (name) => {
+    const json = { ...(FIXTURES[name] as object), sources: sourcesFor(FIXTURES[name]) };
+    const lists = gapLists(json);
+    if (!lists) throw new Error(`${name} with sources should validate`);
+    for (const { section, core: c, artifact: a } of lists) expect(a, section).toEqual(c);
+    // Not vacuous: some section lists several gaps, so a change of order shows.
+    expect(Math.max(...lists.map((l) => l.core.length))).toBeGreaterThan(1);
+  });
+
+  it('lists the gaps core lists on a snapshot built from absent sources', async () => {
+    const built = await buildSnapshot({
+      dir: '/synthetic/none',
+      readText: () => Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' })),
+      now: new Date('2026-01-14T15:00:00Z'),
+    });
+    const json = JSON.parse(JSON.stringify(built.snapshot)) as unknown;
+    expect((json as { sources?: unknown[] }).sources?.length).toBeGreaterThan(0);
+    const lists = gapLists(json);
+    if (!lists) throw new Error('the built snapshot should validate');
+    for (const { section, core: c, artifact: a } of lists) expect(a, section).toEqual(c);
+  });
+
+  it('agrees with core on gaps over every single-value mutation of full.json with sources', () => {
+    const base = {
+      ...(FIXTURES['full.json'] as object),
+      sources: sourcesFor(FIXTURES['full.json']),
+    };
+    const disagreements: string[] = [];
+    let compared = 0;
+    let withGaps = 0;
+    for (const at of paths(base).filter((p) => p.length > 0)) {
+      for (const value of replacements) {
+        const lists = gapLists(mutate(base, at, value));
+        if (!lists) continue;
+        compared += 1;
+        for (const { section, core: c, artifact: a } of lists) {
+          if (c.length > 0) withGaps += 1;
+          if (JSON.stringify(a) !== JSON.stringify(c))
+            disagreements.push(
+              `${at.join('.')} = ${JSON.stringify(value)} on ${section}: core ${c.join(',')}, artifact ${a.join(',')}`,
+            );
+        }
+      }
+    }
+    expect(compared).toBeGreaterThan(500);
+    expect(withGaps).toBeGreaterThan(compared);
+    expect(disagreements).toEqual([]);
   });
 
   it('counts the week in the owner’s calendar', () => {
