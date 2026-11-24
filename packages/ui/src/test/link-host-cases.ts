@@ -69,7 +69,7 @@ export const LINK_HOST_CASES: readonly (readonly [url: string, host: string])[] 
   ['https://example\uFF0Ecom/', ''],
   ['https://example\u3002com/', ''],
   ['https://exa\u200Bmple.com/', ''],
-  // The one known difference from a browser: a label that only looks like punycode. A browser
-  // refuses the link; core's `deepLink` refuses it too, so no validated snapshot carries one.
+  // A label that only looks like punycode. URL parsers disagree on it: some refuse the link, some
+  // accept it with this same host. Answered here either way; never a different host.
   ['https://xn--a.com/', 'xn--a.com'],
 ];

@@ -99,13 +99,15 @@ describe('linkHost', () => {
     }
   });
 
-  it('names a host a browser would refuse only for a label that looks like punycode', () => {
+  it('agrees with the platform on every link both answer; only a punycode look-alike may differ', () => {
+    // URL parsers disagree on a label that only looks like punycode (`xn--a.com`): some refuse
+    // the link, some accept it with this same host. So the row is allowed to be refused by the
+    // platform, never required to be, and no other row may be.
     const refused = LINK_HOST_CASES.filter(([url, host]) => host !== '' && !canParse(url));
-    expect(refused.map(([url]) => url)).toEqual(['https://xn--a.com/']);
-    for (const [url] of refused) expect(deepLink.safeParse(url).success).toBe(false);
-    for (const [url, host] of LINK_HOST_CASES) {
-      if (host !== '' && canParse(url)) expect(new URL(url).hostname).toBe(host);
-    }
+    for (const [url] of refused) expect(url).toBe('https://xn--a.com/');
+    const answered = LINK_HOST_CASES.filter(([url, host]) => host !== '' && canParse(url));
+    expect(answered.length).toBeGreaterThan(10);
+    for (const [url, host] of answered) expect(new URL(url).hostname).toBe(host);
   });
 
   it('answers a very long hostile string at once', () => {

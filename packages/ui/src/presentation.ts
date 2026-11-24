@@ -53,8 +53,9 @@ const HOST_NAME = /^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]
  * with an empty host.
  *
  * For every link `deepLink` accepts, a non-empty answer is exactly `new URL(url).hostname`: the
- * host named is the host the link opens. (Outside those links one difference is known: a label
- * that only looks like punycode, `xn--a.com`, is answered here and refused by a browser.)
+ * host named is the host the link opens. (One spelling is answered here that some URL parsers
+ * refuse outright and others accept with this same host: a label that only looks like punycode,
+ * `xn--a.com`.)
  */
 export function linkHost(url: string): string {
   if (typeof url !== 'string' || !SCHEME.test(url)) return '';
